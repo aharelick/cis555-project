@@ -611,7 +611,7 @@ public class XPathCrawler {
 		}
 		else
 		{
-			System.out.println("File was not a 200, not downloading "+url.toString());
+			System.out.println("File was not a 200, not downloading "+url.toString()+". Response was: "+responseCode);
 			return;
 		}
 		

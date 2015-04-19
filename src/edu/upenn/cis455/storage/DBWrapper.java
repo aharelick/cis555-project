@@ -51,9 +51,9 @@ public class DBWrapper {
         EnvironmentConfig envConfig = new EnvironmentConfig();
         StoreConfig storeConfig = new StoreConfig();
         envConfig.setAllowCreate(true);
-        envConfig.setTransactional(true);
+        envConfig.setTransactional(false);
         storeConfig.setAllowCreate(true);
-        storeConfig.setTransactional(true);
+        storeConfig.setTransactional(false);
         
         myEnv = new Environment(dir,envConfig);
         System.out.println(dir.getAbsolutePath());

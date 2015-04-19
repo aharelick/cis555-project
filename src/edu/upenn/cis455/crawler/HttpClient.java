@@ -88,11 +88,14 @@ public class HttpClient {
 		socket.setSoTimeout(20000);
 		PrintWriter out = new PrintWriter(socket.getOutputStream(), true);
 		//System.out.println("relative path = "+currentUrl.getPath());
-		String request = "GET "+currentUrl+" HTTP/1.0\r\nUser-Agent: cis455crawler\r\n\r\n";
-		//System.out.println(request);
+		String path = currentUrl.getPath();
+		if(!path.startsWith("/"))
+			path = "/" + path;
+		String request = "GET "+path+" HTTP/1.0\r\nUser-Agent: cis455crawler\r\n\r\n";
+		System.out.println(request);
 		out.print(request);
 		out.flush();
-		//System.out.println("just wrote request to socket output stream");
+		System.out.println("just wrote request to socket output stream");
 		String docIn = readInDocument(socket.getInputStream(), currentUrl);
 		socket.close();
 		return docIn;
@@ -228,15 +231,17 @@ public class HttpClient {
 			//System.out.println("relative path = "+currentUrl.getPath());
 			SimpleDateFormat format = new SimpleDateFormat("EEE, dd MMM yyyy HH:mm:ss zzz");
 			DocumentLastCrawlTime documentLastCrawlTime = DBWrapper.getDocumentLastCrawlTime(currentUrl.toString());
-			
-			String request = "HEAD "+currentUrl+" HTTP/1.0\r\nUser-Agent: cis455crawler\r\n";
+			String path = currentUrl.getPath();
+			if(!path.startsWith("/"))
+				path = "/" + path;
+			String request = "HEAD "+path+" HTTP/1.0\r\nUser-Agent: cis455crawler\r\n";
 			if(documentLastCrawlTime!=null)
 			{
 				String dateString = format.format(documentLastCrawlTime.getLastCrawlTime());
 				request+="If-Modified-Since:"+dateString+"\r\n";
 			}
 			request+="\r\n";
-			//System.out.println(request);
+			System.out.println(request+"\n just sent head request");
 			out.print(request);
 			out.flush();
 			InputStream in = socket.getInputStream();

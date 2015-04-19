@@ -2,16 +2,23 @@ package edu.upenn.cis455.crawler;
 
 import java.util.Date;
 
-public class Tuple<X, Y> implements Comparable<Tuple<X,Y>>{ 
-	public final X left; 
-	public final Y right; 
-	public Tuple(X x, Y y) { 
-		left = x; 
-		right = y; 
+public class Tuple implements Comparable<Tuple>{ 
+	public final Date left; 
+	public final String right;
+	
+	public Tuple(Date d, String s) { 
+		left = d; 
+		right = s; 
+	}
+	
+	public Tuple(byte [] arr) {
+		String s = new String(arr);
+		left = new Date(Long.parseLong(s.split("~~~")[0]));
+		right = s.split("~~~")[1];
 	}
 
 	@Override
-	public int compareTo(Tuple<X, Y> arg0) {
+	public int compareTo(Tuple arg0) {
 		Date first = (Date) this.left;
 		Date second = (Date) arg0.left;
 		if (first.getTime() < second.getTime()) {
@@ -25,7 +32,7 @@ public class Tuple<X, Y> implements Comparable<Tuple<X,Y>>{
 	
 	@Override
 	public String toString() {
-		return "<" + left.toString() + ", " + right + ">";
+		return Long.toString(left.getTime()) + "~~~" + right;
 	}
 	
 	public byte[] toByteArray() {

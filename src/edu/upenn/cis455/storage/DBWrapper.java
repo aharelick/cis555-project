@@ -39,6 +39,7 @@ public class DBWrapper {
 	private static PrimaryIndex<String, XmlDoc> xmlDocsIndex;
 	private static PrimaryIndex<Long, UrlForQueue> queueIndex;
 	private static Database crawledDB;
+	private static Database queueDB;
 	//private static PrimaryIndex<String, UrlHasBeenCrawled> crawledIndex;
 	/* TODO: write object store wrapper for BerkeleyDB */
 	public DBWrapper(String dbdir){
@@ -71,6 +72,14 @@ public class DBWrapper {
         dbConfig.setAllowCreate(true);
         crawledDB = myEnv.openDatabase(null, "crawledDB", dbConfig);
         //crawledIndex = store.getPrimaryIndex(String.class, UrlHasBeenCrawled.class);
+        
+        DatabaseConfig queueDBConfig = new DatabaseConfig();
+        queueDBConfig.setAllowCreate(true);
+        queueDBConfig.setTransactional(false);
+        queueDBConfig.setDeferredWrite(true);
+        queueDBConfig.setBtreeComparator();
+        
+        queueDB = myEnv.openDatabase(null,  "queueDB", queueDBConfig);
         
         //close database every time the program is shutdown
         DatabaseShutdownHook hook = new DatabaseShutdownHook(myEnv, store, crawledDB);

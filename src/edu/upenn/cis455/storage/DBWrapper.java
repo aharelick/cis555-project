@@ -15,6 +15,7 @@ import com.sleepycat.persist.EntityStore;
 import com.sleepycat.persist.PrimaryIndex;
 import com.sleepycat.persist.StoreConfig;
 
+import edu.upenn.cis455.crawler.QueueComparator;
 import edu.upenn.cis455.crawler.RobotsTxtInfo;
 
 /**
@@ -77,7 +78,7 @@ public class DBWrapper {
         queueDBConfig.setAllowCreate(true);
         queueDBConfig.setTransactional(false);
         queueDBConfig.setDeferredWrite(true);
-        queueDBConfig.setBtreeComparator();
+        queueDBConfig.setBtreeComparator(new QueueComparator());
         
         queueDB = myEnv.openDatabase(null,  "queueDB", queueDBConfig);
         

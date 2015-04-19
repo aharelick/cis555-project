@@ -56,7 +56,7 @@ public class PriorityBlockingQueue {
 	}
 	public synchronized void push(Tuple<String, Date> urlAndDate, String urlValue)
 	{
-		final DatabaseEntry newKey = new DatabaseEntry(urlAndDate.toBytearray());
+		final DatabaseEntry newKey = new DatabaseEntry(urlAndDate.toByteArray());
 		final DatabaseEntry newValue = new DatabaseEntry(urlValue.getBytes());
 		queueDB.put(null, newKey, newValue);
 		counter++;

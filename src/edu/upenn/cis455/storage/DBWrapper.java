@@ -1,6 +1,7 @@
 package edu.upenn.cis455.storage;
 
 import java.io.File;
+import java.io.UnsupportedEncodingException;
 import java.util.ArrayList;
 import java.util.NoSuchElementException;
 
@@ -15,8 +16,10 @@ import com.sleepycat.persist.EntityStore;
 import com.sleepycat.persist.PrimaryIndex;
 import com.sleepycat.persist.StoreConfig;
 
+import edu.upenn.cis455.crawler.PriorityBlockingQueue;
 import edu.upenn.cis455.crawler.QueueComparator;
 import edu.upenn.cis455.crawler.RobotsTxtInfo;
+import edu.upenn.cis455.crawler.Tuple;
 
 /**
  * The wrapper for the Berkeley DB database using primary indexes and entities and one database to store all
@@ -41,6 +44,7 @@ public class DBWrapper {
 	private static PrimaryIndex<Long, UrlForQueue> queueIndex;
 	private static Database crawledDB;
 	private static Database queueDB;
+	private static PriorityBlockingQueue headQueue;
 	//private static PrimaryIndex<String, UrlHasBeenCrawled> crawledIndex;
 	/* TODO: write object store wrapper for BerkeleyDB */
 	public DBWrapper(String dbdir){
@@ -81,11 +85,26 @@ public class DBWrapper {
         queueDBConfig.setBtreeComparator(new QueueComparator());
         
         queueDB = myEnv.openDatabase(null,  "queueDB", queueDBConfig);
+        headQueue = new PriorityBlockingQueue(queueDB, 0);
         
         //close database every time the program is shutdown
-        DatabaseShutdownHook hook = new DatabaseShutdownHook(myEnv, store, crawledDB);
+        DatabaseShutdownHook hook = new DatabaseShutdownHook(myEnv, store, crawledDB, queueDB);
         Runtime.getRuntime().addShutdownHook(hook);
         System.out.println("Database Started");
+	}
+	public static Tuple getNextOnQueue() throws UnsupportedEncodingException
+	{
+		return headQueue.pull();
+	}
+	public static void putOnQueue(Tuple urlAndDate, String urlValue)
+	{
+		headQueue.push(urlAndDate, urlValue);
+	}
+	public static void closeQueueDB()
+	{
+		queueDB.close();
+		crawledDB.close();
+		myEnv.close();
 	}
 	public static void storeUser(User newUser)
 	{

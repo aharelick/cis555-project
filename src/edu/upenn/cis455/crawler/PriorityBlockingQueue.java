@@ -30,17 +30,18 @@ public class PriorityBlockingQueue {
 		counter = 0;
 		this.cacheSize = cacheSize;
 	}
-	public String pull() throws UnsupportedEncodingException
+	public Tuple pull() throws UnsupportedEncodingException
 	{
 		final DatabaseEntry key = new DatabaseEntry();
 		final DatabaseEntry value = new DatabaseEntry();
 		final Cursor cursor = queueDB.openCursor(null, null);
 		try {
 			cursor.getFirst(key, value, LockMode.RMW);
+			System.out.println("In PULL key: "+key.getData()+" value: "+ value.getData());
 			if(value.getData() == null)
 				return null;
 		
-			final String result = new String(value.getData(), "UTF-8");
+			Tuple result = new Tuple(key.getData());
 			cursor.delete();
 			counter++;
 			if(counter >= cacheSize)
@@ -58,6 +59,7 @@ public class PriorityBlockingQueue {
 	{
 		final DatabaseEntry newKey = new DatabaseEntry(urlAndDate.toByteArray());
 		final DatabaseEntry newValue = new DatabaseEntry(urlValue.getBytes());
+		System.out.println("in PUSH tuple = "+urlAndDate.left.toString()+" "+urlAndDate.right);
 		queueDB.put(null, newKey, newValue);
 		counter++;
 		if(counter >= cacheSize)

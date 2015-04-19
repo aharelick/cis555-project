@@ -799,8 +799,22 @@ public class XPathCrawler {
 		} catch (SAXException | ParserConfigurationException e) {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
-		}
-			
+		}	
 	}
-	
+	private void testQueue() throws UnsupportedEncodingException
+	{
+		String urlValue = "http://whatitworks.com";
+		String urlFutureValue = "does it?";
+		Date futureDate = new Date(new Date().getTime()+5000);
+		Tuple urlAndDateFuture = new Tuple(futureDate, urlFutureValue);
+		DBWrapper.putOnQueue(urlAndDateFuture, urlValue);
+		Tuple urlAndDate = new Tuple(new Date(), urlValue );
+		DBWrapper.putOnQueue(urlAndDate, urlValue);
+		Tuple urlandDateMid = new Tuple(new Date(futureDate.getTime()-3000), "i think it does");
+		DBWrapper.putOnQueue(urlandDateMid, "i think it does");
+		System.out.println(DBWrapper.getNextOnQueue().toString());
+		Tuple tups = DBWrapper.getNextOnQueue();
+		System.out.println(tups.toString());
+		System.out.println(DBWrapper.getNextOnQueue().toString());
+	}
 }

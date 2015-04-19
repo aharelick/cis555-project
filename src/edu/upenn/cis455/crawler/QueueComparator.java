@@ -2,12 +2,12 @@ package edu.upenn.cis455.crawler;
 
 import java.io.Serializable;
 import java.util.Comparator;
-import java.util.Date;
 
-public class QueueComparator implements Comparator<Tuple<String, Date>>, Serializable {
+public class QueueComparator implements Comparator<byte[]>, Serializable {
 
 	@Override
-	public int compare(Tuple<String, Date> o1, Tuple<String, Date> o2) {
-		return o1.compareTo(o2);
+	public int compare(byte[] o1, byte[] o2) {
+		// TODO Auto-generated method stub
+		return 0;
 	}
 }

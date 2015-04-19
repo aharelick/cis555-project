@@ -55,6 +55,7 @@ public class XPathCrawler {
 	private static int numCrawled =0;
 	private static HttpClient client;
 	private static UrlForQueue firstUrlForQueue;
+	private static HashMap<String, ArrayList<String>> urlToUrlList;
 	//private static BlockingQueue<URL> urlFrontierQueue;
 	/**
 	 * Default Constructor. Not used in practice. Just for testing from Servlet in beginning.
@@ -708,6 +709,7 @@ public class XPathCrawler {
 	private static void getLinksFromJsoupDoc(org.jsoup.nodes.Document doc, URL currentUrl) throws MalformedURLException
 	{
 		Elements links = doc.select("a[href]");
+		ArrayList<String> allLinks = new ArrayList(); 
 		for(Element link: links)
 		{
 			System.out.println("link: "+link.attr("href") + " link text: "+link.text());
@@ -728,8 +730,12 @@ public class XPathCrawler {
 			long lastIndex = DBWrapper.getLastIndex();
 			long currentIndex = lastIndex+1;
 			UrlForQueue urlForQueue = new UrlForQueue(currentIndex, absoluteUrl);
+			allLinks.add(absoluteUrl);
 			DBWrapper.storeUrlForQueue(urlForQueue);
-		}
+		} 
+		//TODO make sure not being added multiple times if page has already been crawled
+		urlToUrlList.put(currentUrl.toString(), allLinks);
+		
 	}
 	/**
 	 * sets the initial url string
@@ -782,6 +788,7 @@ public class XPathCrawler {
 		clearQueue();
 		UrlForQueue urlForQueue = new UrlForQueue(Long.valueOf(0), startUrlString);
 		DBWrapper.storeUrlForQueue(urlForQueue);
+		urlToUrlList = new HashMap<String, ArrayList<String>>();
 		/*For testing db connection between servlet and crawler
 		 * User newUser = new User("test", "pass");
 		DBWrapper.storeUser(newUser);

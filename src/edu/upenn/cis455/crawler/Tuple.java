@@ -27,4 +27,8 @@ public class Tuple<X, Y> implements Comparable<Tuple<X,Y>>{
 	public String toString() {
 		return "<" + left.toString() + ", " + right + ">";
 	}
+	
+	public byte[] toByteArray(Tuple<X,Y> t) {
+		return t.toString().getBytes();
+	}
 } 

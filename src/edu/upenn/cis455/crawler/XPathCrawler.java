@@ -632,7 +632,7 @@ public class XPathCrawler {
 		{
 			org.jsoup.nodes.Document jsoupDoc = Jsoup.parse(retrievedDocument);
 			try {
-				getLinksFromJsoupDoc(jsoupDoc, url, htmlDoc);
+				getLinksFromJsoupDoc(jsoupDoc, url);
 			} catch (MalformedURLException e) {
 				// TODO Auto-generated catch block
 				e.printStackTrace();
@@ -711,7 +711,7 @@ public class XPathCrawler {
 	 * @param htmlDoc
 	 * @throws MalformedURLException
 	 */
-	private static void getLinksFromJsoupDoc(org.jsoup.nodes.Document doc, URL currentUrl, HtmlDoc htmlDoc) throws MalformedURLException
+	private static void getLinksFromJsoupDoc(org.jsoup.nodes.Document doc, URL currentUrl) throws MalformedURLException
 	{
 		Elements links = doc.select("a[href]");
 		ArrayList<String> allLinks = new ArrayList(); 
@@ -738,14 +738,7 @@ public class XPathCrawler {
 			allLinks.add(absoluteUrl);
 			DBWrapper.storeUrlForQueue(urlForQueue);
 		} 
-		//only add document's list of links to the hashmap if it is the first time it is being crawled which can be seen by
-		//the htmlDoc that should be stored locally existing or not. If it exists, this is not the first time the doc has been
-		//crawled. If htmlDoc is null then this is the first time this document has been crawled.
-		if(htmlDoc == null)
-		{
-		//TODO make sure not being added multiple times if page has already been crawled
 		urlToUrlList.put(currentUrl.toString(), allLinks);
-		}
 		
 	}
 	/**

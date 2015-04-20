@@ -303,6 +303,10 @@ public class XPathCrawler {
 					else
 						crawlDelay = 1;
 				}
+				else
+				{
+					crawlDelay = 1;
+				}
 				//check if is past crawlDelay
 				if(hasWaitedCrawlDelay(currentUrl, crawlDelay))
 				{
@@ -705,6 +709,7 @@ public class XPathCrawler {
 	 * gets all links from an HTML document using the jsoup DOM Document. All links are added to the queue
 	 * @param doc
 	 * @param currentUrl
+	 * @param htmlDoc
 	 * @throws MalformedURLException
 	 */
 	private static void getLinksFromJsoupDoc(org.jsoup.nodes.Document doc, URL currentUrl) throws MalformedURLException
@@ -734,7 +739,6 @@ public class XPathCrawler {
 			allLinks.add(absoluteUrl);
 			DBWrapper.storeUrlForQueue(urlForQueue);
 		} 
-		//TODO make sure not being added multiple times if page has already been crawled
 		urlToUrlList.put(currentUrl.toString(), allLinks);
 		
 	}

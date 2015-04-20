@@ -45,6 +45,7 @@ public class DBWrapper {
 	private static Database crawledDB;
 	private static Database queueDB;
 	private static PriorityBlockingQueue headQueue;
+	private static PriorityBlockingQueue getQueue;
 	//private static PrimaryIndex<String, UrlHasBeenCrawled> crawledIndex;
 	/* TODO: write object store wrapper for BerkeleyDB */
 	public DBWrapper(String dbdir){
@@ -86,19 +87,28 @@ public class DBWrapper {
         
         queueDB = myEnv.openDatabase(null,  "queueDB", queueDBConfig);
         headQueue = new PriorityBlockingQueue(queueDB, 0);
+        getQueue = new PriorityBlockingQueue(queueDB, 0);
         
         //close database every time the program is shutdown
         DatabaseShutdownHook hook = new DatabaseShutdownHook(myEnv, store, crawledDB, queueDB);
         Runtime.getRuntime().addShutdownHook(hook);
         System.out.println("Database Started");
 	}
-	public static Tuple getNextOnQueue() throws UnsupportedEncodingException
+	public static Tuple getNextOnHeadQueue() throws UnsupportedEncodingException
 	{
 		return headQueue.pull();
 	}
-	public static void putOnQueue(Tuple urlAndDate, String urlValue)
+	public static void putOnHeadQueue(Tuple urlAndDate, String urlValue)
 	{
 		headQueue.push(urlAndDate, urlValue);
+	}
+	public static Tuple getNextOnGetQueue() throws UnsupportedEncodingException
+	{
+		return getQueue.pull();
+	}
+	public static void putOnGetQueue(Tuple urlAndDate, String urlValue)
+	{
+		getQueue.push(urlAndDate, urlValue);
 	}
 	public static void closeQueueDB()
 	{

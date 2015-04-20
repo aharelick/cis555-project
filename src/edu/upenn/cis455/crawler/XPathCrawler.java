@@ -56,6 +56,7 @@ public class XPathCrawler {
 	private static HttpClient client;
 	private static UrlForQueue firstUrlForQueue;
 	private static HashMap<String, ArrayList<String>> urlToUrlList;
+	private static boolean shutdown = false;
 	//private static BlockingQueue<URL> urlFrontierQueue;
 	/**
 	 * Default Constructor. Not used in practice. Just for testing from Servlet in beginning.
@@ -797,7 +798,21 @@ public class XPathCrawler {
 		channel.setName("first channel");
 		DBWrapper.storeChannel(channel);
 		System.out.println("channel name stored is: "+DBWrapper.getChannel("first channel").getName());
-		*/
+		 */
+
+		//TODO add first url to head queue
+		
+		//Create thread pools to run the crawler
+		Thread[] headPool = new Thread[10];
+		Thread[] getPool = new Thread[10];
+		for (int i = 0; i < 10; i++) {
+			headPool[i] = new Thread(new HEADThreadRunnable());
+			headPool[i].start();
+			getPool[i] = new Thread(new GETThreadRunnable());
+			getPool[i].start();
+		}
+		
+		//WILL NOT need code below after threads are implemented
 		try {
 			startCrawling();
 			System.out.println("num crawled: "+numCrawled);
@@ -808,20 +823,66 @@ public class XPathCrawler {
 			e.printStackTrace();
 		}	
 	}
+
+	/**
+	 * The HEADThread class takes URLs from the HEADqueue, check for the
+	 * robots.txt file if it hasn't been fetched already, and then sends 
+	 * a HEAD request to determine if it should download the page.
+	 */
+	static class HEADThreadRunnable implements Runnable {	
+    	public void run() {
+    		while (!shutdown) { //this is to keep the thread alive and not return
+        		String url = DBWrapper.getNextOnHeadQueue().right;
+        		//This line is necessary for the shutdown call, see PriorityBlockingQueue
+        		if (url == null) {
+        			break;
+        		}
+        		try {
+					processHEAD(url);
+				} catch (IOException e) {
+					e.printStackTrace();
+				}
+    		}
+    	}
+    }
+	
+	/**
+	 * The GETThread class takes URLs from the GETqueue, downloads the page,
+	 * if the page is HTML it extracts links, otherwise it checks XPaths and 
+	 * updates channels if necessary.
+	 */
+	static class GETThreadRunnable implements Runnable {
+		public void run() {
+			while (!shutdown) { //this is to keep the thread alive and not return
+				String url = DBWrapper.getNextOnGetQueue().right;
+				//This line is necessary for the shutdown call, see HandlerQueue
+				if (url == null) {
+					break;
+				}
+				try {
+					processGET(url);
+				} catch (Exception e) {
+					e.printStackTrace();
+				}
+				
+			}
+		}
+	}
+	
 	private void testQueue() throws UnsupportedEncodingException
 	{
 		String urlValue = "http://whatitworks.com";
 		String urlFutureValue = "does it?";
 		Date futureDate = new Date(new Date().getTime()+5000);
 		Tuple urlAndDateFuture = new Tuple(futureDate, urlFutureValue);
-		DBWrapper.putOnQueue(urlAndDateFuture, urlValue);
+		DBWrapper.putOnHeadQueue(urlAndDateFuture, urlValue);
 		Tuple urlAndDate = new Tuple(new Date(), urlValue );
-		DBWrapper.putOnQueue(urlAndDate, urlValue);
+		DBWrapper.putOnHeadQueue(urlAndDate, urlValue);
 		Tuple urlandDateMid = new Tuple(new Date(futureDate.getTime()-3000), "i think it does");
-		DBWrapper.putOnQueue(urlandDateMid, "i think it does");
-		System.out.println(DBWrapper.getNextOnQueue().toString());
-		Tuple tups = DBWrapper.getNextOnQueue();
+		DBWrapper.putOnHeadQueue(urlandDateMid, "i think it does");
+		System.out.println(DBWrapper.getNextOnHeadQueue().toString());
+		Tuple tups = DBWrapper.getNextOnHeadQueue();
 		System.out.println(tups.toString());
-		System.out.println(DBWrapper.getNextOnQueue().toString());
+		System.out.println(DBWrapper.getNextOnHeadQueue().toString());
 	}
 }

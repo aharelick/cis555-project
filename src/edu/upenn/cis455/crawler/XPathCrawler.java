@@ -186,7 +186,7 @@ public class XPathCrawler {
 	 */
 	private static RobotsTxtInfo parseRobotsTxt(String robotsUrl) throws IOException, ParseException
 	{
-		String retrievedDocument = client.getDocument(robotsUrl);
+		String retrievedDocument = client.getDocument(robotsUrl).right;
 		RobotsTxtInfo robotInfo = new RobotsTxtInfo();
 		ArrayList<String> expectedKeywords = new ArrayList<String>();
 		expectedKeywords.add("User-agent");
@@ -638,6 +638,7 @@ public class XPathCrawler {
 			return;
 		}		
 		//Document doc = DOMBuilder.jsoup2DOM(jsoupDoc);
+		//used to be parseDocument() here
 	}
 	private static void addToGetQueue(int crawlDelay, URL currentUrl)
 	{
@@ -944,8 +945,12 @@ public class XPathCrawler {
 		}
 		return crawlDelay;
 	}
-	public static void processGet()
+	public static void processGet(String url) throws IOException
 	{
+		GenericTuple<String, String> tuple = client.getDocument(url);
+		String contentType = tuple.left;
+		String retrievedDocument = tuple.right;
+		parseDocument(retrievedDocument, contentType, new URL(url), null, null);
 		/*
 		 * //check if is past crawlDelay
 				if(hasWaitedCrawlDelay(currentUrl, crawlDelay))
@@ -981,7 +986,12 @@ public class XPathCrawler {
         		if (url == null) {
         			break;
         		}
-        		processHead(url);
+        		try {
+					processHead(url);
+				} catch (MalformedURLException | UnsupportedEncodingException e) {
+					// TODO Auto-generated catch block
+					e.printStackTrace();
+				}
     		}
     	}
     }
@@ -994,7 +1004,13 @@ public class XPathCrawler {
 	static class GetThreadRunnable implements Runnable {
 		public void run() {
 			while (!shutdown) { //this is to keep the thread alive and not return
-				String url = DBWrapper.getNextOnGetQueue().right;
+				String url = null;
+				try {
+					url = DBWrapper.getNextOnGetQueue().right;
+				} catch (UnsupportedEncodingException e1) {
+					// TODO Auto-generated catch block
+					e1.printStackTrace();
+				}
 				//This line is necessary for the shutdown call, see HandlerQueue
 				if (url == null) {
 					break;

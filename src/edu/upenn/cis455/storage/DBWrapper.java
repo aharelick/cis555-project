@@ -94,17 +94,31 @@ public class DBWrapper {
         Runtime.getRuntime().addShutdownHook(hook);
         System.out.println("Database Started");
 	}
-	public static Tuple getNextOnHeadQueue() throws UnsupportedEncodingException
+	public static Tuple getNextOnHeadQueue() throws UnsupportedEncodingException, InterruptedException
 	{
-		return headQueue.pull();
+		Tuple dateAndUrl = headQueue.pull();
+		long currentTime = System.currentTimeMillis();
+		long futureCrawlTime = dateAndUrl.left.getTime();
+		if(futureCrawlTime>currentTime)
+		{
+			Thread.sleep(futureCrawlTime-currentTime);
+		}
+		return dateAndUrl;
 	}
 	public static void putOnHeadQueue(Tuple urlAndDate, String urlValue)
 	{
 		headQueue.push(urlAndDate, urlValue);
 	}
-	public static Tuple getNextOnGetQueue() throws UnsupportedEncodingException
+	public static Tuple getNextOnGetQueue() throws UnsupportedEncodingException, InterruptedException
 	{
-		return getQueue.pull();
+		Tuple dateAndUrl = getQueue.pull();
+		long currentTime = System.currentTimeMillis();
+		long futureCrawlTime = dateAndUrl.left.getTime();
+		if(futureCrawlTime>currentTime)
+		{
+			Thread.sleep(futureCrawlTime-currentTime);
+		}
+		return dateAndUrl;
 	}
 	public static void putOnGetQueue(Tuple urlAndDate, String urlValue)
 	{

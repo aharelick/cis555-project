@@ -978,7 +978,7 @@ public class XPathCrawler {
         		String url = null;
 				try {
 					url = DBWrapper.getNextOnHeadQueue().right;
-				} catch (UnsupportedEncodingException e1) {
+				} catch (UnsupportedEncodingException | InterruptedException e1) {
 					// TODO Auto-generated catch block
 					e1.printStackTrace();
 				}
@@ -1007,7 +1007,7 @@ public class XPathCrawler {
 				String url = null;
 				try {
 					url = DBWrapper.getNextOnGetQueue().right;
-				} catch (UnsupportedEncodingException e1) {
+				} catch (UnsupportedEncodingException | InterruptedException e1) {
 					// TODO Auto-generated catch block
 					e1.printStackTrace();
 				}
@@ -1025,7 +1025,7 @@ public class XPathCrawler {
 		}
 	}
 	
-	private void testQueue() throws UnsupportedEncodingException
+	private void testQueue() throws UnsupportedEncodingException, InterruptedException
 	{
 		String urlValue = "http://whatitworks.com";
 		String urlFutureValue = "does it?";

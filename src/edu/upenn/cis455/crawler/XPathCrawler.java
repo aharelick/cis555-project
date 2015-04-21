@@ -33,7 +33,7 @@ import edu.upenn.cis455.storage.Channel;
 import edu.upenn.cis455.storage.DBWrapper;
 import edu.upenn.cis455.storage.DocumentLastCrawlTime;
 import edu.upenn.cis455.storage.HtmlDoc;
-import edu.upenn.cis455.storage.ServerLastCrawlTime;
+import edu.upenn.cis455.storage.ServerFutureCrawlTime;
 import edu.upenn.cis455.storage.UrlForQueue;
 import edu.upenn.cis455.storage.XmlDoc;
 import edu.upenn.cis455.xpathengine.DOMBuilder;
@@ -118,15 +118,16 @@ public class XPathCrawler {
 	 * sends the HEAD request, if it's a 200 OK,
 	 * downloads the robots.txt file if it exists and parses it which stores it in the database
 	 * @param currentUrl
+	 * @returns true if a robots.txt was downloaded and false otherwise
 	 */
-	private static void downloadRobotsTxt(URL currentUrl)
+	private static boolean robotsTxtHandler(URL currentUrl)
 	{
 		String baseUrl = getBaseUrl(currentUrl);
 		String robotsUrlString = baseUrl+"/"+"robots.txt";
 		if(DBWrapper.getRobotsInfo(baseUrl)!=null)
 		{
 			//System.out.println("robots.txt has already been downloaded and parsed");
-			return;
+			return false;
 		}
 		URL robotsUrl = null;
 		try {
@@ -139,15 +140,15 @@ public class XPathCrawler {
 		try {
 			headers = client.sendHead(robotsUrl);
 		} catch (ParseException e) {
-			return;
+			return false;
 		} catch (UnknownHostException e) {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
-			return;
+			return false;
 		} catch (IOException e) {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
-			return;
+			return false;
 		}
 		String responseCode = headers.get("Status").get(0);
 		if(responseCode.contains("200"))
@@ -157,19 +158,23 @@ public class XPathCrawler {
 			try {
 				robotsInfo = parseRobotsTxt(robotsUrlString);
 			} catch (ParseException e) {
-				return;
+				return true;
 			} catch (IOException e) {
 				// TODO Auto-generated catch block
 				e.printStackTrace();
-				return;
+				return true;
 			}
 			robotsInfo.setServerUrl(baseUrl);
 			DBWrapper.storeRobotsInfo(robotsInfo);
 		}
 		else if(responseCode.contains("301")||responseCode.contains("302"))
 			System.out.println("should redirect probably");
-		
+		else {
+			RobotsTxtInfo robotsInfo = new RobotsTxtInfo();
+			DBWrapper.storeRobotsInfo(robotsInfo);
 			
+		}
+		return true;	
 	}
 	/**
 	 * parses the robots.txt according to the different keywords. adding all implemented keywords to the robotsTxtInfo object
@@ -280,13 +285,14 @@ public class XPathCrawler {
 	 * @throws SAXException
 	 * @throws ParserConfigurationException
 	 */
+	@Deprecated
 	private static void startCrawling() throws UnknownHostException, IOException, ParseException, SAXException, ParserConfigurationException
 	{
 		//maxNumFiles == -1 means crawl infinitely
 		while(!DBWrapper.isQueueEmpty()&&(numCrawled<maxNumFiles||maxNumFiles==-1))
 		{
 			URL currentUrl = new URL(DBWrapper.removeUrlForQueue().getUrl());
-			downloadRobotsTxt(currentUrl);
+			robotsTxtHandler(currentUrl);
 			//if url can be crawled
 			RobotsTxtInfo robotsInfo = DBWrapper.getRobotsInfo(getBaseUrl(currentUrl));
 			if(robotsInfo==null||checkRobotsDirectives(currentUrl, robotsInfo))
@@ -311,9 +317,9 @@ public class XPathCrawler {
 				if(hasWaitedCrawlDelay(currentUrl, crawlDelay))
 				{
 					System.out.println("server of url: "+currentUrl.toString()+" has waited crawl delay, crawlDelay was: "+crawlDelay);
-					crawlDocument(currentUrl, crawlDelay);
+					headRequestHandler(currentUrl, crawlDelay);
 					//store last crawl time in DB
-					ServerLastCrawlTime lastCrawlTime = new ServerLastCrawlTime(getBaseUrl(currentUrl), System.currentTimeMillis());
+					ServerFutureCrawlTime lastCrawlTime = new ServerFutureCrawlTime(getBaseUrl(currentUrl), System.currentTimeMillis());
 					DBWrapper.storeServerLastCrawlTime(lastCrawlTime);
 				}
 				else
@@ -337,12 +343,12 @@ public class XPathCrawler {
 	{
 		//crawl delay is in seconds so it must be converted to milliseconds
 		long crawlDelayLong = crawlDelay*1000;
-		ServerLastCrawlTime lastCrawled = DBWrapper.getServerLastCrawlTime(getBaseUrl(currentUrl));
+		ServerFutureCrawlTime futureCrawlTime = DBWrapper.getServerFutureCrawlTime(currentUrl.getHost());
 
-		if(lastCrawled == null)//if is null then current server has never been crawled before so it has waited the crawl delay
+		if(futureCrawlTime == null)//if is null then current server has never been crawled before so it has waited the crawl delay
 			return true;
 		
-		else if((System.currentTimeMillis()-lastCrawled.getLastCrawlTime())>crawlDelayLong)
+		else if((System.currentTimeMillis()-futureCrawlTime.getFutureCrawlTime())>crawlDelayLong)
 			return true;
 		else
 			return false;
@@ -509,8 +515,15 @@ public class XPathCrawler {
 	 * @throws ParserConfigurationException
 	 * @throws IOException
 	 */
-	private static void crawlDocument(URL url, int crawlDelay) throws SAXException, ParserConfigurationException, IOException
+	private static void headRequestHandler(URL url, int crawlDelay) throws SAXException, ParserConfigurationException, IOException
 	{
+		//if the url has already been crawled this crawl then don't crawl it again
+		if(DBWrapper.urlHasBeenCrawled(url.toString()))
+		{
+			System.out.println("url has already been crawled this crawl. skipping");
+			return;
+		}
+		//send the HEAD request
 		HashMap<String, List<String>> headers = null;
 		try {
 			headers = client.sendHead(url);
@@ -522,11 +535,7 @@ public class XPathCrawler {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
 		}
-		if(DBWrapper.urlHasBeenCrawled(url.toString()))
-		{
-			System.out.println("url has already been crawled this crawl. skipping");
-			return;
-		}
+		
 		if(headers == null)
 			return;
 		String responseCode = headers.get("Status").get(0);
@@ -585,15 +594,18 @@ public class XPathCrawler {
 				System.out.println("error no stored HTML or XML document with that url");
 				return;
 			}
+			parseDocument(retrievedDocument, contentType, url, htmlDoc, xmlDoc);
 			
 		}
 		else if(responseCode.contains("301")||responseCode.contains("302"))
 		{
-			System.out.println("redirect, add to queue");
 			if(headers.containsKey("Location"))
 			{
-				UrlForQueue urlForQueue = new UrlForQueue(DBWrapper.getLastIndex()+1, headers.get("Location").get(0));
-				DBWrapper.storeUrlForQueue(urlForQueue);
+				URL currentUrl = new URL(headers.get("Location").get(0));
+				System.out.println("redirect, add to queue");
+				RobotsTxtInfo robotsInfo = DBWrapper.getRobotsInfo(getBaseUrl(currentUrl));
+				int newURLcrawlDelay = getCrawlDelay(robotsInfo);
+				addToHeadQueue(newURLcrawlDelay, currentUrl);
 			}
 			else
 			{
@@ -604,7 +616,11 @@ public class XPathCrawler {
 		}
 		else if(responseCode.contains("200"))
 		{
-			System.out.println("File was a 200, waiting crawl delay, then downloading: "+url.toString());
+			//ADD to GET QUEUE
+			addToGetQueue(crawlDelay, url);
+			System.out.println("File was a 200, adding URL to get queue: "+url.toString());
+			/*
+			
 			try {
 				Thread.sleep(crawlDelay*1000);
 			} catch (InterruptedException e) {
@@ -614,14 +630,64 @@ public class XPathCrawler {
 			retrievedDocument = client.getDocument(url.toString());
 			//store to mark as being crawled in this crawl
 			DBWrapper.storeUrlHasBeenCrawled(url.toString());
+			*/
 		}
 		else
 		{
 			System.out.println("File was not a 200, not downloading "+url.toString()+". Response was: "+responseCode);
 			return;
+		}		
+		//Document doc = DOMBuilder.jsoup2DOM(jsoupDoc);
+	}
+	private static void addToGetQueue(int crawlDelay, URL currentUrl)
+	{
+		ServerFutureCrawlTime futureTime = DBWrapper.getServerFutureCrawlTime(currentUrl.getHost());
+		//if not null, this host name has been crawled at least once before
+		long futureTimeToCrawl = System.currentTimeMillis();
+		if(futureTime != null)
+		{
+			futureTimeToCrawl = futureTime.getFutureCrawlTime();
+			
+			futureTimeToCrawl += crawlDelay; 
 		}
-		
-		
+		Tuple dateAndUrl = new Tuple(new Date(futureTimeToCrawl), currentUrl.toString());
+		DBWrapper.putOnGetQueue(dateAndUrl, currentUrl.toString());
+		//store next future crawl time in DB
+		ServerFutureCrawlTime futureCrawlTime = new ServerFutureCrawlTime(currentUrl.getHost(), futureTimeToCrawl);
+		DBWrapper.storeServerLastCrawlTime(futureCrawlTime);
+	}
+	/**
+	 * adds the specified url to the head queue and updates the server future crawl time
+	 * @param crawlDelay
+	 * @param currentUrl
+	 */
+	private static void addToHeadQueue(int crawlDelay, URL currentUrl)
+	{
+		ServerFutureCrawlTime futureTime = DBWrapper.getServerFutureCrawlTime(currentUrl.getHost());
+		//if not null, this host name has been crawled at least once before
+		long futureTimeToCrawl = System.currentTimeMillis();
+		if(futureTime != null)
+		{
+			futureTimeToCrawl = futureTime.getFutureCrawlTime();
+			
+			futureTimeToCrawl += crawlDelay; 
+		}
+		Tuple dateAndUrl = new Tuple(new Date(futureTimeToCrawl), currentUrl.toString());
+		DBWrapper.putOnHeadQueue(dateAndUrl, currentUrl.toString());
+		//store next future crawl time in DB
+		ServerFutureCrawlTime futureCrawlTime = new ServerFutureCrawlTime(currentUrl.getHost(), futureTimeToCrawl);
+		DBWrapper.storeServerLastCrawlTime(futureCrawlTime);
+	}
+	/**
+	 * parses a downloaded or locally stored document and adds the links to the head queue
+	 * @param retrievedDocument
+	 * @param contentType
+	 * @param url
+	 * @param htmlDoc
+	 * @param xmlDoc
+	 */
+	private static void parseDocument(String retrievedDocument, String contentType, URL url, HtmlDoc htmlDoc, XmlDoc xmlDoc)
+	{
 		SimpleDateFormat format = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss");
 		Date currentDate = new Date();
 		String dateString = format.format(currentDate);
@@ -683,7 +749,8 @@ public class XPathCrawler {
 		     }
 
 		}
-		//Document doc = DOMBuilder.jsoup2DOM(jsoupDoc);
+		//store to mark as being crawled in this crawl
+		DBWrapper.storeUrlHasBeenCrawled(url.toString());
 	}
 	/**
 	 * Iterates through the EntityCursor of Channels to retrieve a list of all channels
@@ -810,9 +877,9 @@ public class XPathCrawler {
 		Thread[] headPool = new Thread[10];
 		Thread[] getPool = new Thread[10];
 		for (int i = 0; i < 10; i++) {
-			headPool[i] = new Thread(new HEADThreadRunnable());
+			headPool[i] = new Thread(new HeadThreadRunnable());
 			headPool[i].start();
-			getPool[i] = new Thread(new GETThreadRunnable());
+			getPool[i] = new Thread(new GetThreadRunnable());
 			getPool[i].start();
 		}
 		
@@ -827,25 +894,94 @@ public class XPathCrawler {
 			e.printStackTrace();
 		}	
 	}
-
+	public static void processHead(String url) throws MalformedURLException, UnsupportedEncodingException
+	{
+		if(url == null)
+			return;
+	
+		URL currentUrl = new URL(url);
+		//checks if robotsTxtInfo already stored, fetches if not, if not robots.txt, 
+		//creates an empty RobotsTxtInfo and stores it 
+		boolean downloaded = robotsTxtHandler(currentUrl);
+		
+		RobotsTxtInfo robotsInfo = DBWrapper.getRobotsInfo(getBaseUrl(currentUrl));
+		int crawlDelay = getCrawlDelay(robotsInfo);
+		if(downloaded && checkRobotsDirectives(currentUrl, robotsInfo))
+		{
+			addToHeadQueue(crawlDelay, currentUrl);
+		}
+		else{
+			//robots.txt was not downloaded because not the first time this host has been seen
+			
+		}
+		
+		if(robotsInfo==null||checkRobotsDirectives(currentUrl, robotsInfo))
+		{
+			//System.out.println("url can be crawled: "+ currentUrl.toString());
+			
+			
+		}
+		
+		
+		
+	}
+	private static int getCrawlDelay(RobotsTxtInfo robotsInfo)
+	{
+		int crawlDelay = 1;
+		if(robotsInfo!=null)
+		{
+		
+			if(robotsInfo.crawlContainsUserAgent("cis455crawler"))
+				crawlDelay = robotsInfo.getCrawlDelay("cis455crawler");
+			else if(robotsInfo.crawlContainsUserAgent("*"))
+				crawlDelay = robotsInfo.getCrawlDelay("*");
+			else
+				crawlDelay = 1;
+		}
+		else
+		{
+			crawlDelay = 1;
+		}
+		return crawlDelay;
+	}
+	public static void processGet()
+	{
+		/*
+		 * //check if is past crawlDelay
+				if(hasWaitedCrawlDelay(currentUrl, crawlDelay))
+				{
+					System.out.println("server of url: "+currentUrl.toString()+" has waited crawl delay, crawlDelay was: "+crawlDelay);
+					crawlDocument(currentUrl, crawlDelay);
+					
+				}
+				else
+				{
+					//System.out.println("server of url: "+currentUrl.toString()+" has NOT waited crawl delay, crawlDelay is "+crawlDelay);
+					UrlForQueue urlForQueue = new UrlForQueue(DBWrapper.getLastIndex()+1, currentUrl.toString());
+					DBWrapper.storeUrlForQueue(urlForQueue);
+				}
+		 */
+	}
 	/**
-	 * The HEADThread class takes URLs from the HEADqueue, check for the
+	 * The HeadThread class takes URLs from the headQueue, check for the
 	 * robots.txt file if it hasn't been fetched already, and then sends 
 	 * a HEAD request to determine if it should download the page.
 	 */
-	static class HEADThreadRunnable implements Runnable {	
+	static class HeadThreadRunnable implements Runnable {	
     	public void run() {
     		while (!shutdown) { //this is to keep the thread alive and not return
-        		String url = DBWrapper.getNextOnHeadQueue().right;
+        		String url = null;
+				try {
+					url = DBWrapper.getNextOnHeadQueue().right;
+				} catch (UnsupportedEncodingException e1) {
+					// TODO Auto-generated catch block
+					e1.printStackTrace();
+				}
         		//This line is necessary for the shutdown call, see PriorityBlockingQueue
         		if (url == null) {
         			break;
         		}
-        		try {
-					processHEAD(url);
-				} catch (IOException e) {
-					e.printStackTrace();
-				}
+        		processHead(url);
     		}
     	}
     }
@@ -855,7 +991,7 @@ public class XPathCrawler {
 	 * if the page is HTML it extracts links, otherwise it checks XPaths and 
 	 * updates channels if necessary.
 	 */
-	static class GETThreadRunnable implements Runnable {
+	static class GetThreadRunnable implements Runnable {
 		public void run() {
 			while (!shutdown) { //this is to keep the thread alive and not return
 				String url = DBWrapper.getNextOnGetQueue().right;
@@ -864,7 +1000,7 @@ public class XPathCrawler {
 					break;
 				}
 				try {
-					processGET(url);
+					processGet(url);
 				} catch (Exception e) {
 					e.printStackTrace();
 				}

@@ -15,7 +15,6 @@ public class Doc {
 		url = u;
 		html = h;
 		wordOccurrences = new HashMap<String,Integer>();
-		parseDocument();
 	}
 	
 	/**
@@ -27,7 +26,7 @@ public class Doc {
 	private void addToInvertedIndex(String word) {
 		// This is currently changing something like "Horses." to
 		// "horses" and "carry-on" becomes "carryon"
-		String basicWord = word.replaceAll("[A-Za-z0-9", "");
+		String basicWord = word.replaceAll("[^A-Za-z0-9]", "");
 		if (wordOccurrences.containsKey(basicWord)) {
 			int tmp = wordOccurrences.get(basicWord);
 			wordOccurrences.put(basicWord, tmp += 1);
@@ -47,7 +46,7 @@ public class Doc {
 	
 	private HashMap<String, Integer> wordOccurrences;
 	
-	private void parseDocument() {
+	public void parseDocument() {
 		Document d = Jsoup.parse(html);
 		String text = d.body().text();
 		String[] tokens = text.split(" ");
@@ -72,7 +71,7 @@ public class Doc {
 	 */
 	public Integer getTermFrequency(String word) {
 		// might be an unnecessary line of code
-		String basicWord = word.replaceAll("[A-Za-z0-9", "");
+		String basicWord = word.replaceAll("[^A-Za-z0-9]", "");
 		return wordOccurrences.get(basicWord);
 	}
 	

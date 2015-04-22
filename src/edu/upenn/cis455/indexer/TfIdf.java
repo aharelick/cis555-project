@@ -10,6 +10,7 @@ public class TfIdf extends Thread {
 	
 	@Override
 	public void run() {
+		doc.parseDocument();
 		
 	}
 }

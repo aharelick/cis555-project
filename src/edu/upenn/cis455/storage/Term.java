@@ -5,7 +5,13 @@ import java.util.LinkedList;
 
 import com.sleepycat.persist.model.Entity;
 import com.sleepycat.persist.model.PrimaryKey;
-
+/**
+ * The term entity class.
+ * Will be used to store each term and it's tf and proximity scores.
+ * Using the term as the primary key, the class has a map of 
+ * URLs to term frequencies and a map of URLs to list of locations in
+ * the respective document.
+ */
 @Entity
 public class Term {
 	
@@ -20,11 +26,11 @@ public class Term {
 	}
 	
 	public void addFrequency(String url, double freq) {
-		
+		tf.put(url, freq);
 	}
 	
-	public void addLocation(String url, int loc) {
-		
+	public void addLocationList(String url, LinkedList<Integer> loc) {
+		locations.put(url, loc);
 	}
 
 }

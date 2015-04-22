@@ -6,15 +6,18 @@ import java.util.Set;
 
 import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
+import org.jsoup.parser.Parser;
 
 public class Doc {
 
 	private String url;
 	private String html;
+	private String type;
 	
-	public Doc(String u, String h) {
+	public Doc(String u, String h, String t) {
 		url = u;
 		html = h;
+		type = t;
 		wordOccurrences = new HashMap<String,Integer>();
 		locations = new HashMap<String, LinkedList<Integer>>();
 	}
@@ -54,7 +57,14 @@ public class Doc {
 	private HashMap<String, Integer> wordOccurrences;
 	
 	public void parseDocument() {
-		Document d = Jsoup.parse(html);
+		Document d = null;
+		if (type.equals("XML")) {
+			d = Jsoup.parse(html, "", Parser.xmlParser());
+		} else if (type.equals("HTML")) {
+			d = Jsoup.parse(html);
+		} else {
+			System.out.println("Something went wrong parsing doc");
+		}
 		String text = d.body().text();
 		String[] tokens = text.split(" ");
 		int i = 0;

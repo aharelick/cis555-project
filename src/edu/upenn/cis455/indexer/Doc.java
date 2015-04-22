@@ -48,6 +48,9 @@ public class Doc {
 	}
 	*/
 	
+	/**
+	 * maps a term to the number of times it occurs in this document
+	 */
 	private HashMap<String, Integer> wordOccurrences;
 	
 	public void parseDocument() {
@@ -61,14 +64,9 @@ public class Doc {
 			i++;
 		}
 		//pushInvertedIndex();
-		pushTfScores();
-		pushLocations();
+		pushDocInfo();
 	}
 	
-	private void pushLocations() {
-		// TODO put all these jawn to the db
-		
-	}
 
 	private void addLocation(String t, int i) {
 		if (locations.containsKey(t)) {
@@ -82,13 +80,20 @@ public class Doc {
 		}
 	}
 	
+	/**
+	 * maps a term to a list of locations it appears in this document
+	 */
 	private HashMap<String, LinkedList<Integer>> locations;
 
-	private void pushTfScores() {
+	private void pushDocInfo() {
 		// put all the TF scores in the DB
 		// DB has a term as the key that maps a url to that term's
 		//frequency, check if contained in the hashmap first before putting
-		
+		HashMap<String,Double> scores = new HashMap<String,Double>();
+		for (String term : wordOccurrences.keySet()) {
+			scores.put(term, getTermFrequency(term));
+		}
+		Corpus.addDocInfo(url, scores, locations);
 	}
 
 	/**

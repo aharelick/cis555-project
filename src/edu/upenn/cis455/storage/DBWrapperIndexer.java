@@ -44,8 +44,8 @@ public class DBWrapperIndexer {
         // TODO add shutdown hook
 	}
 	
-	public static void getTerm(String term) {
-		termIndex.get(term);
+	public static Term getTerm(String term) {
+		return termIndex.get(term);
 	}
 	
 	public static void putTerm(Term term) {

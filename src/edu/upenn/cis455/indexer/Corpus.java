@@ -5,12 +5,9 @@ import java.util.LinkedList;
 
 public class Corpus {
 	
-	public static void addFrequency(String url, HashMap<String, Double> tf) {
-		
-	}
-	
-	public static void addLocation(String url, HashMap<String, LinkedList<Integer>> loc) {
-		
+	public static void addDocInfo(String url, HashMap<String, Double> tf,
+			HashMap<String, LinkedList<Integer>> loc) {
+
 	}
 	
 }

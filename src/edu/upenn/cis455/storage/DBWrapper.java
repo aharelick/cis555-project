@@ -36,7 +36,7 @@ public class DBWrapper {
 	
 	private static PrimaryIndex<String, User> userIndex;
 	private static PrimaryIndex<String, RobotsTxtInfo> robotsIndex;
-	private static PrimaryIndex<String, ServerLastCrawlTime> serverLastCrawlIndex;
+	private static PrimaryIndex<String, ServerFutureCrawlTime> serverFutureCrawlIndex;
 	private static PrimaryIndex<String, DocumentLastCrawlTime> documentLastCrawlIndex;
 	private static PrimaryIndex<String, Channel> channelIndex;
 	private static PrimaryIndex<String, HtmlDoc> htmlDocsIndex;
@@ -67,7 +67,7 @@ public class DBWrapper {
         store = new EntityStore(myEnv, "EntityStore", storeConfig);
         userIndex = store.getPrimaryIndex(String.class, User.class);
         robotsIndex = store.getPrimaryIndex(String.class, RobotsTxtInfo.class);
-        serverLastCrawlIndex = store.getPrimaryIndex(String.class, ServerLastCrawlTime.class);
+        serverFutureCrawlIndex = store.getPrimaryIndex(String.class, ServerFutureCrawlTime.class);
         documentLastCrawlIndex = store.getPrimaryIndex(String.class, DocumentLastCrawlTime.class);
         channelIndex = store.getPrimaryIndex(String.class, Channel.class);
         htmlDocsIndex = store.getPrimaryIndex(String.class, HtmlDoc.class);
@@ -91,17 +91,31 @@ public class DBWrapper {
         
         System.out.println("Database Started");
 	}
-	public static Tuple getNextOnHeadQueue() throws UnsupportedEncodingException
+	public static Tuple getNextOnHeadQueue() throws UnsupportedEncodingException, InterruptedException
 	{
-		return headQueue.pull();
+		Tuple dateAndUrl = headQueue.pull();
+		long currentTime = System.currentTimeMillis();
+		long futureCrawlTime = dateAndUrl.left.getTime();
+		if(futureCrawlTime>currentTime)
+		{
+			Thread.sleep(futureCrawlTime-currentTime);
+		}
+		return dateAndUrl;
 	}
 	public static void putOnHeadQueue(Tuple urlAndDate, String urlValue)
 	{
 		headQueue.push(urlAndDate, urlValue);
 	}
-	public static Tuple getNextOnGetQueue() throws UnsupportedEncodingException
+	public static Tuple getNextOnGetQueue() throws UnsupportedEncodingException, InterruptedException
 	{
-		return getQueue.pull();
+		Tuple dateAndUrl = getQueue.pull();
+		long currentTime = System.currentTimeMillis();
+		long futureCrawlTime = dateAndUrl.left.getTime();
+		if(futureCrawlTime>currentTime)
+		{
+			Thread.sleep(futureCrawlTime-currentTime);
+		}
+		return dateAndUrl;
 	}
 	public static void putOnGetQueue(Tuple urlAndDate, String urlValue)
 	{
@@ -129,13 +143,13 @@ public class DBWrapper {
 	{
 		return robotsIndex.get(serverUrl);
 	}
-	public static void storeServerLastCrawlTime(ServerLastCrawlTime lastCrawlTime)
+	public static void storeServerLastCrawlTime(ServerFutureCrawlTime lastCrawlTime)
 	{
-		serverLastCrawlIndex.put(lastCrawlTime);
+		serverFutureCrawlIndex.put(lastCrawlTime);
 	}
-	public static ServerLastCrawlTime getServerLastCrawlTime(String serverUrl)
+	public static ServerFutureCrawlTime getServerFutureCrawlTime(String serverUrl)
 	{
-		return serverLastCrawlIndex.get(serverUrl);
+		return serverFutureCrawlIndex.get(serverUrl);
 	}
 	public static void storeDocumentLastCrawlTime(DocumentLastCrawlTime lastCrawlTime)
 	{

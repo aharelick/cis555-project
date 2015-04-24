@@ -9,23 +9,23 @@ import com.sleepycat.persist.model.PrimaryKey;
  *
  */
 @Entity
-public class ServerLastCrawlTime {
+public class ServerFutureCrawlTime {
 
 	@PrimaryKey
 	private String serverUrl;
 	
-	private long lastCrawlTime;
-	public ServerLastCrawlTime()
+	private long futureCrawlTime;
+	public ServerFutureCrawlTime()
 	{
 		
 	}
-	public ServerLastCrawlTime(String url, long crawlTime)
+	public ServerFutureCrawlTime(String url, long crawlTime)
 	{
 		serverUrl = url;
-		lastCrawlTime = crawlTime;
+		futureCrawlTime = crawlTime;
 	}
-	public long getLastCrawlTime()
+	public long getFutureCrawlTime()
 	{
-		return lastCrawlTime;
+		return futureCrawlTime;
 	}
 }

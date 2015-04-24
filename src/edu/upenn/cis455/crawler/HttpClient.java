@@ -65,7 +65,7 @@ public class HttpClient {
 	 * @returns the document as a string
 	 * @throws IOException
 	 */
-	private String downloadViaHttps(URL currentUrl) throws IOException
+	private GenericTuple<String, String> downloadViaHttps(URL currentUrl) throws IOException
 	{
 		HttpsURLConnection connection = (HttpsURLConnection)currentUrl.openConnection();
 		connection.setRequestProperty("User-Agent:", "cis455crawler");
@@ -73,16 +73,16 @@ public class HttpClient {
 		connection.setReadTimeout(30000);
 		String[] nosemicolons = connection.getContentType().split(";");
 		contentType = nosemicolons[0];
-		String docIn = readInDocument((InputStream)connection.getContent(), currentUrl);
+		GenericTuple<String, String> docInTuple = readInDocument((InputStream)connection.getContent(), currentUrl);
 		connection.disconnect();
-		return docIn;
+		return docInTuple;
 	}
 	/**
 	 * sets up the socket for http and calls readInDocument to download the document and 
 	 * @returns the document as a string
 	 * @throws IOException
 	 */
-	private String downloadViaHttp(URL currentUrl) throws IOException
+	private GenericTuple<String, String> downloadViaHttp(URL currentUrl) throws IOException
 	{
 		Socket socket = new Socket(currentUrl.getHost(), 80);
 		socket.setSoTimeout(20000);
@@ -96,9 +96,9 @@ public class HttpClient {
 		out.print(request);
 		out.flush();
 		System.out.println("just wrote request to socket output stream");
-		String docIn = readInDocument(socket.getInputStream(), currentUrl);
+		GenericTuple<String, String> docInTuple = readInDocument(socket.getInputStream(), currentUrl);
 		socket.close();
-		return docIn;
+		return docInTuple;
 		
 		
 	}
@@ -163,7 +163,7 @@ public class HttpClient {
 	 * @return
 	 * @throws IOException
 	 */
-	private String readInDocument(InputStream inStream, URL currentUrl) throws IOException
+	private GenericTuple<String, String> readInDocument(InputStream inStream, URL currentUrl) throws IOException
 	{
 		//System.out.println("in readInDocument");
 		BufferedReader in = new BufferedReader(new InputStreamReader(inStream));
@@ -193,7 +193,8 @@ public class HttpClient {
 			fullDocument+=line+"\n";
 		}
 		//System.out.println("after while loop");
-		return fullDocument;
+		GenericTuple<String, String> contentTypeAndDocument = new GenericTuple<String, String>(contentType, fullDocument);
+		return contentTypeAndDocument;
 	}
 	/**
 	 * checks if the protocol is http
@@ -281,7 +282,7 @@ public class HttpClient {
 	 * @returns the document as a string
 	 * @throws IOException
 	 */
-	public String getDocument(String urlString) throws IOException
+	public GenericTuple<String, String> getDocument(String urlString) throws IOException
 	{
 		URL currentUrl = new URL(urlString);
 		if(currentUrl.getProtocol().equals("https"))

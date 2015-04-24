@@ -816,7 +816,7 @@ public class XPathCrawler {
 			getPool[i].start();
 		}
 		
-		//WILL NOT need code below after threads are implemented
+		//TODO WILL NOT need code below after threads are implemented
 		try {
 			startCrawling();
 			System.out.println("num crawled: "+numCrawled);
@@ -826,6 +826,15 @@ public class XPathCrawler {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
 		}	
+
+		//add a shutdown hook to properly close DB
+		Runtime.getRuntime().addShutdownHook(new Thread() {
+			public void run() {
+				DBWrapper.close();
+				shutdown = true;
+				System.out.println("Proper Shutdown.");
+			}
+		});
 	}
 
 	/**

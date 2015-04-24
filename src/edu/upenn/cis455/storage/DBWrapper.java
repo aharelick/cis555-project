@@ -89,9 +89,6 @@ public class DBWrapper {
         headQueue = new PriorityBlockingQueue(queueDB, 0);
         getQueue = new PriorityBlockingQueue(queueDB, 0);
         
-        //close database every time the program is shutdown
-        DatabaseShutdownHook hook = new DatabaseShutdownHook(myEnv, store, crawledDB, queueDB);
-        Runtime.getRuntime().addShutdownHook(hook);
         System.out.println("Database Started");
 	}
 	public static Tuple getNextOnHeadQueue() throws UnsupportedEncodingException
@@ -252,5 +249,21 @@ public class DBWrapper {
 		myEnv.removeDatabase(null, "crawledDB");
 		
 	}
-	
+	/**
+	 * Called from the Crawler's shutdown hook, this method closes down the
+	 * databases and the environment properly.
+	 */
+	public static void close()
+	{
+		if(myEnv!=null)
+		{
+			crawledDB.close();
+			queueDB.close();
+			//myEnv.removeDatabase(null, "crawledDB");
+			//myEnv.removeDatabase(null, "queueDB");
+			store.close();
+			myEnv.close();
+			System.out.println("Closed the Database");
+		}
+	}	
 }

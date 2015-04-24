@@ -101,13 +101,14 @@ public class DBWrapper {
 		long futureCrawlTime = dateAndUrl.left.getTime();
 		if(futureCrawlTime>currentTime)
 		{
+			System.out.println("cannot crawl head yet. sleeping for: "+(futureCrawlTime-currentTime));
 			Thread.sleep(futureCrawlTime-currentTime);
 		}
 		return dateAndUrl;
 	}
-	public static void putOnHeadQueue(Tuple urlAndDate, String urlValue)
+	public static void putOnHeadQueue(Tuple dateAndUrl, String urlValue)
 	{
-		headQueue.push(urlAndDate, urlValue);
+		headQueue.push(dateAndUrl, urlValue);
 	}
 	public static Tuple getNextOnGetQueue() throws UnsupportedEncodingException, InterruptedException
 	{
@@ -116,6 +117,7 @@ public class DBWrapper {
 		long futureCrawlTime = dateAndUrl.left.getTime();
 		if(futureCrawlTime>currentTime)
 		{
+			System.out.println("cannot crawl get yet. sleeping for: "+(futureCrawlTime-currentTime));
 			Thread.sleep(futureCrawlTime-currentTime);
 		}
 		return dateAndUrl;
@@ -146,7 +148,7 @@ public class DBWrapper {
 	{
 		return robotsIndex.get(serverUrl);
 	}
-	public static void storeServerLastCrawlTime(ServerFutureCrawlTime lastCrawlTime)
+	public static void storeServerFutureCrawlTime(ServerFutureCrawlTime lastCrawlTime)
 	{
 		serverFutureCrawlIndex.put(lastCrawlTime);
 	}

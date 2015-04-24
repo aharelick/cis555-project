@@ -8,6 +8,7 @@ import com.sleepycat.je.Cursor;
 import com.sleepycat.je.Database;
 import com.sleepycat.je.DatabaseEntry;
 import com.sleepycat.je.LockMode;
+import com.sleepycat.je.OperationStatus;
 /**
  * adapted from http://sysgears.com/articles/lightweight-fast-persistent-queue-in-java-using-berkley-db/
  * @author Kelsey Duncombe-Smith
@@ -30,28 +31,37 @@ public class PriorityBlockingQueue {
 		counter = 0;
 		this.cacheSize = cacheSize;
 	}
-	public Tuple pull() throws UnsupportedEncodingException
+	public Tuple pull() throws UnsupportedEncodingException, InterruptedException
 	{
 		final DatabaseEntry key = new DatabaseEntry();
 		final DatabaseEntry value = new DatabaseEntry();
-		final Cursor cursor = queueDB.openCursor(null, null);
-		try {
-			cursor.getFirst(key, value, LockMode.RMW);
-			System.out.println("In PULL key: "+key.getData()+" value: "+ value.getData());
-			if(value.getData() == null)
-				return null;
-		
-			Tuple result = new Tuple(key.getData());
-			cursor.delete();
-			counter++;
-			if(counter >= cacheSize)
-			{
-				queueDB.sync();
-				counter = 0;
+		synchronized(queueDB)
+		{
+			final Cursor cursor = queueDB.openCursor(null, null);
+			try {
+				
+				while(cursor.getFirst(key, value, LockMode.RMW)==OperationStatus.NOTFOUND)
+					queueDB.wait();
+				
+				System.out.println("In PULL key: "+key.getData().toString()+" value: "+ value.getData().toString());
+				if(value.getData() == null)
+				{
+					System.out.println("value of data is null");
+					return null;
+				}
+			
+				Tuple result = new Tuple(key.getData());
+				cursor.delete();
+				counter++;
+				if(counter >= cacheSize)
+				{
+					queueDB.sync();
+					counter = 0;
+				}
+				return result;
+			} finally {
+				cursor.close();
 			}
-			return result;
-		} finally {
-			cursor.close();
 		}
 		
 	}
@@ -60,13 +70,17 @@ public class PriorityBlockingQueue {
 		final DatabaseEntry newKey = new DatabaseEntry(urlAndDate.toByteArray());
 		final DatabaseEntry newValue = new DatabaseEntry(urlValue.getBytes());
 		System.out.println("in PUSH tuple = "+urlAndDate.left.toString()+" "+urlAndDate.right);
-		queueDB.put(null, newKey, newValue);
-		counter++;
-		if(counter >= cacheSize)
+		synchronized(queueDB)
 		{
-			queueDB.sync();
-			counter = 0;
-		}	
+			queueDB.put(null, newKey, newValue);
+			counter++;
+			if(counter >= cacheSize)
+			{
+				queueDB.sync();
+				queueDB.notify();
+				counter = 0;
+			}
+		}
 	}
 
 }

@@ -31,6 +31,20 @@ public class PriorityBlockingQueue {
 		counter = 0;
 		this.cacheSize = cacheSize;
 	}
+	public boolean isEmpty()
+	{
+		final DatabaseEntry key = new DatabaseEntry();
+		final DatabaseEntry value = new DatabaseEntry();
+		final Cursor cursor = queueDB.openCursor(null, null);
+		if(cursor.getFirst(key, value, LockMode.RMW)==OperationStatus.NOTFOUND)
+		{
+			return true;
+		}
+		else
+		{
+			return false;
+		}
+	}
 	public Tuple pull() throws UnsupportedEncodingException, InterruptedException
 	{
 		final DatabaseEntry key = new DatabaseEntry();

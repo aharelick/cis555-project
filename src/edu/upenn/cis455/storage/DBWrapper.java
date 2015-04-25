@@ -107,6 +107,20 @@ public class DBWrapper {
 	{
 		headQueue.push(dateAndUrl, urlValue);
 	}
+	public static void clearHeadQueue() throws UnsupportedEncodingException, InterruptedException
+	{
+		while(!headQueue.isEmpty())
+		{
+			headQueue.pull();
+		}
+	}
+	public static void clearGetQueue() throws UnsupportedEncodingException, InterruptedException
+	{
+		while(!getQueue.isEmpty())
+		{
+			getQueue.pull();
+		}
+	}
 	public static Tuple getNextOnGetQueue() throws UnsupportedEncodingException, InterruptedException
 	{
 		Tuple dateAndUrl = getQueue.pull();
@@ -122,6 +136,10 @@ public class DBWrapper {
 	public static void putOnGetQueue(Tuple urlAndDate, String urlValue)
 	{
 		getQueue.push(urlAndDate, urlValue);
+	}
+	public static boolean isGetQueueEmpty()
+	{
+		return getQueue.isEmpty();
 	}
 	public static void closeQueueDB()
 	{
@@ -145,13 +163,24 @@ public class DBWrapper {
 	{
 		return robotsIndex.get(serverUrl);
 	}
-	public static void storeServerFutureCrawlTime(ServerFutureCrawlTime lastCrawlTime)
+	public synchronized static void storeServerFutureCrawlTime(ServerFutureCrawlTime lastCrawlTime)
 	{
 		serverFutureCrawlIndex.put(lastCrawlTime);
 	}
-	public static ServerFutureCrawlTime getServerFutureCrawlTime(String serverUrl)
+	public synchronized static ServerFutureCrawlTime getServerFutureCrawlTime(String serverUrl)
 	{
 		return serverFutureCrawlIndex.get(serverUrl);
+	}
+	public static void removeServerFutureCrawlTime()
+	{
+		String key = serverFutureCrawlIndex.sortedMap().firstKey();
+		ServerFutureCrawlTime futureCrawl = serverFutureCrawlIndex.get(key);
+		if(futureCrawl!=null)
+			serverFutureCrawlIndex.delete(key);
+	}
+	public static boolean isServerFutureCrawlTimeEmpty()
+	{
+			return serverFutureCrawlIndex.sortedMap().isEmpty();
 	}
 	public static void storeDocumentLastCrawlTime(DocumentLastCrawlTime lastCrawlTime)
 	{

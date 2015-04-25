@@ -649,11 +649,13 @@ public class XPathCrawler {
 			
 			futureTimeToCrawl += crawlDelay; 
 		}
+		ServerFutureCrawlTime futureCrawlTime = new ServerFutureCrawlTime(currentUrl.getHost(), futureTimeToCrawl);
+		DBWrapper.storeServerFutureCrawlTime(futureCrawlTime);
+		
 		Tuple dateAndUrl = new Tuple(new Date(futureTimeToCrawl), currentUrl.toString());
 		DBWrapper.putOnGetQueue(dateAndUrl, currentUrl.toString());
 		//store next future crawl time in DB
-		ServerFutureCrawlTime futureCrawlTime = new ServerFutureCrawlTime(currentUrl.getHost(), futureTimeToCrawl);
-		DBWrapper.storeServerFutureCrawlTime(futureCrawlTime);
+		
 	}
 	/**
 	 * adds the specified url to the head queue and updates the server future crawl time
@@ -673,11 +675,13 @@ public class XPathCrawler {
 			
 			futureTimeToCrawl += crawlDelay; 
 		}
+		ServerFutureCrawlTime futureCrawlTime = new ServerFutureCrawlTime(currentUrl.getHost(), futureTimeToCrawl);
+		DBWrapper.storeServerFutureCrawlTime(futureCrawlTime);
+		
 		Tuple dateAndUrl = new Tuple(new Date(futureTimeToCrawl), currentUrl.toString());
 		DBWrapper.putOnHeadQueue(dateAndUrl, currentUrl.toString());
 		//store next future crawl time in DB
-		ServerFutureCrawlTime futureCrawlTime = new ServerFutureCrawlTime(currentUrl.getHost(), futureTimeToCrawl);
-		DBWrapper.storeServerFutureCrawlTime(futureCrawlTime);
+		
 	}
 	/**
 	 * parses a downloaded or locally stored document and adds the links to the head queue
@@ -825,8 +829,30 @@ public class XPathCrawler {
 		startUrlString = url;
 	}
 	/**
+	 * clears head and get queues completely
+	 */
+	private static void clearQueues()
+	{
+		
+		try {
+			DBWrapper.clearHeadQueue();
+			DBWrapper.clearGetQueue();
+		} catch (UnsupportedEncodingException | InterruptedException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+	}
+	private static void clearServerFutureCrawlTimeIndex()
+	{
+		while(!DBWrapper.isServerFutureCrawlTimeEmpty())
+		{
+			DBWrapper.removeServerFutureCrawlTime();
+		}
+	}
+	/**
 	 * clears any UrlForQueue objects left in the queue from the last crawl
 	 */
+	@Deprecated
 	private static void clearQueue()
 	{
 		while(!DBWrapper.isQueueEmpty())
@@ -1005,7 +1031,9 @@ public class XPathCrawler {
 		
 		DBWrapper wrapper = new DBWrapper(storePath);
 		System.out.println("clearing queue of links from previous crawl");
-		clearQueue();
+		//clearQueue();
+		clearQueues();
+		clearServerFutureCrawlTimeIndex();
 		addToHeadQueue(new URL(startUrlString));
 		
 		/*old way of putting on queue

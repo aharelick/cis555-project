@@ -852,7 +852,6 @@ public class XPathCrawler {
 		}
 		else if(!downloaded && canCrawl){
 			//robots.txt was not downloaded because not the first time this host has been seen
-			System.out.println("robots.txt already downloaded");
 			int crawlDelay = getCrawlDelay(robotsInfo);
 			addToGetQueue(crawlDelay, currentUrl);
 			
@@ -907,7 +906,6 @@ public class XPathCrawler {
 	 */
 	static class HeadThreadRunnable implements Runnable {	
     	public void run() {
-    		System.out.println("head thread started, shutdown is: "+ shutdown);
     		while (!shutdown) { //this is to keep the thread alive and not return
         		String url = null;
 				try {
@@ -938,7 +936,6 @@ public class XPathCrawler {
 	static class GetThreadRunnable implements Runnable {
 		
 		public void run() {
-			System.out.println("get thread started, shutdown is: "+ shutdown);
 			while (!shutdown) { //this is to keep the thread alive and not return
 				String url = null;
 				try {
@@ -1031,11 +1028,11 @@ public class XPathCrawler {
 		//Create thread pools to run the crawler
 		Thread[] headPool = new Thread[10];
 		Thread[] getPool = new Thread[10];
-		for (int i = 0; i < 10; i++) {
+		for (int i = 0; i < 1; i++) {
 			headPool[i] = new Thread(new HeadThreadRunnable());
 			headPool[i].start();
-			getPool[i] = new Thread(new GetThreadRunnable());
-			getPool[i].start();
+	//		getPool[i] = new Thread(new GetThreadRunnable());
+	//		getPool[i].start();
 		}
 
 		//add a shutdown hook to properly close DB

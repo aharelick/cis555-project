@@ -43,7 +43,6 @@ public class PriorityBlockingQueue {
 				while(cursor.getFirst(key, value, LockMode.RMW)==OperationStatus.NOTFOUND)
 					queueDB.wait();
 				
-				System.out.println("In PULL key: "+key.getData().toString()+" value: "+ value.getData().toString());
 				if(value.getData() == null)
 				{
 					System.out.println("value of data is null");
@@ -69,7 +68,6 @@ public class PriorityBlockingQueue {
 	{
 		final DatabaseEntry newKey = new DatabaseEntry(urlAndDate.toByteArray());
 		final DatabaseEntry newValue = new DatabaseEntry(urlValue.getBytes());
-		System.out.println("in PUSH tuple = "+urlAndDate.left.toString()+" "+urlAndDate.right);
 		synchronized(queueDB)
 		{
 			queueDB.put(null, newKey, newValue);

@@ -871,16 +871,24 @@ public class XPathCrawler {
 		
 		RobotsTxtInfo robotsInfo = DBWrapper.getRobotsInfo(getBaseUrl(currentUrl));
 		boolean canCrawl = checkRobotsDirectives(currentUrl, robotsInfo);
+		//robots.txt just downloaded so add back to head queue to send head request next time
 		if(downloaded && canCrawl)
 		{
 			System.out.println("robots.txt downloaded and can crawl site, adding url: "+currentUrl+" to Head queue");
 			addToHeadQueue(currentUrl);
 		}
+		//robots.txt previously downloaded, so go ahead and crawl
 		else if(!downloaded && canCrawl){
 			//robots.txt was not downloaded because not the first time this host has been seen
 			System.out.println("robots.txt already downloaded");
+			
 			int crawlDelay = getCrawlDelay(robotsInfo);
-			addToGetQueue(crawlDelay, currentUrl);
+			try {
+				headRequestHandler(currentUrl, crawlDelay);
+			} catch (SAXException | ParserConfigurationException | IOException e) {
+				// TODO Auto-generated catch block
+				e.printStackTrace();
+			}
 			
 		}
 		else
@@ -1059,7 +1067,7 @@ public class XPathCrawler {
 		//Create thread pools to run the crawler
 		Thread[] headPool = new Thread[10];
 		Thread[] getPool = new Thread[10];
-		for (int i = 0; i < 10; i++) {
+		for (int i = 0; i < 1; i++) {
 			headPool[i] = new Thread(new HeadThreadRunnable());
 			headPool[i].start();
 			getPool[i] = new Thread(new GetThreadRunnable());

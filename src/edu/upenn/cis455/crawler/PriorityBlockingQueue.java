@@ -59,7 +59,10 @@ public class PriorityBlockingQueue {
 			try {
 				
 				while(cursor.getFirst(key, value, LockMode.RMW)==OperationStatus.NOTFOUND)
+				{ 
+					System.out.println("first key not found on: "+(this.head?"HEAD:":"GET:"));
 					queueDB.wait();
+				}
 				
 				
 				if(value.getData() == null)

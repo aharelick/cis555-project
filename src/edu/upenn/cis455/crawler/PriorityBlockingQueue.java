@@ -38,10 +38,12 @@ public class PriorityBlockingQueue {
 		final Cursor cursor = queueDB.openCursor(null, null);
 		if(cursor.getFirst(key, value, LockMode.RMW)==OperationStatus.NOTFOUND)
 		{
+			cursor.close();
 			return true;
 		}
 		else
 		{
+			cursor.close();
 			return false;
 		}
 	}
@@ -64,6 +66,7 @@ public class PriorityBlockingQueue {
 				}
 			
 				Tuple result = new Tuple(key.getData());
+				System.out.println("In PULL key: left: "+result.left+" right: "+ result.right);
 				cursor.delete();
 				counter++;
 				if(counter >= cacheSize)

@@ -320,7 +320,7 @@ public class XPathCrawler {
 					headRequestHandler(currentUrl, crawlDelay);
 					//store last crawl time in DB
 					ServerFutureCrawlTime lastCrawlTime = new ServerFutureCrawlTime(getBaseUrl(currentUrl), System.currentTimeMillis());
-					DBWrapper.storeServerLastCrawlTime(lastCrawlTime);
+					DBWrapper.storeServerFutureCrawlTime(lastCrawlTime);
 				}
 				else
 				{
@@ -603,9 +603,7 @@ public class XPathCrawler {
 			{
 				URL currentUrl = new URL(headers.get("Location").get(0));
 				System.out.println("redirect, add to queue");
-				RobotsTxtInfo robotsInfo = DBWrapper.getRobotsInfo(getBaseUrl(currentUrl));
-				int newURLcrawlDelay = getCrawlDelay(robotsInfo);
-				addToHeadQueue(newURLcrawlDelay, currentUrl);
+				addToHeadQueue(currentUrl);
 			}
 			else
 			{
@@ -655,15 +653,17 @@ public class XPathCrawler {
 		DBWrapper.putOnGetQueue(dateAndUrl, currentUrl.toString());
 		//store next future crawl time in DB
 		ServerFutureCrawlTime futureCrawlTime = new ServerFutureCrawlTime(currentUrl.getHost(), futureTimeToCrawl);
-		DBWrapper.storeServerLastCrawlTime(futureCrawlTime);
+		DBWrapper.storeServerFutureCrawlTime(futureCrawlTime);
 	}
 	/**
 	 * adds the specified url to the head queue and updates the server future crawl time
 	 * @param crawlDelay
 	 * @param currentUrl
 	 */
-	private static void addToHeadQueue(int crawlDelay, URL currentUrl)
+	private static void addToHeadQueue(URL currentUrl)
 	{
+		RobotsTxtInfo robotsInfo = DBWrapper.getRobotsInfo(getBaseUrl(currentUrl));
+		int crawlDelay = getCrawlDelay(robotsInfo);
 		ServerFutureCrawlTime futureTime = DBWrapper.getServerFutureCrawlTime(currentUrl.getHost());
 		//if not null, this host name has been crawled at least once before
 		long futureTimeToCrawl = System.currentTimeMillis();
@@ -677,7 +677,7 @@ public class XPathCrawler {
 		DBWrapper.putOnHeadQueue(dateAndUrl, currentUrl.toString());
 		//store next future crawl time in DB
 		ServerFutureCrawlTime futureCrawlTime = new ServerFutureCrawlTime(currentUrl.getHost(), futureTimeToCrawl);
-		DBWrapper.storeServerLastCrawlTime(futureCrawlTime);
+		DBWrapper.storeServerFutureCrawlTime(futureCrawlTime);
 	}
 	/**
 	 * parses a downloaded or locally stored document and adds the links to the head queue
@@ -803,9 +803,14 @@ public class XPathCrawler {
 			}
 			long lastIndex = DBWrapper.getLastIndex();
 			long currentIndex = lastIndex+1;
-			UrlForQueue urlForQueue = new UrlForQueue(currentIndex, absoluteUrl);
+			Tuple tupleForQueue = new Tuple(new Date(), absoluteUrl);
+			addToHeadQueue(new URL(absoluteUrl));
+			/*
+			 * old way to add to queue
+			 * UrlForQueue urlForQueue = new UrlForQueue(currentIndex, absoluteUrl);
 			allLinks.add(absoluteUrl);
 			DBWrapper.storeUrlForQueue(urlForQueue);
+			 */
 		} 
 		urlToUrlList.put(currentUrl.toString(), allLinks);
 		
@@ -827,83 +832,7 @@ public class XPathCrawler {
 		while(!DBWrapper.isQueueEmpty())
 			DBWrapper.removeUrlForQueue();
 	}
-	/**
-	 * takes in 3-4 command line arguments to initialize the crawler and its constraints.
-	 * @param args
-	 * @throws UnknownHostException
-	 * @throws IOException
-	 * @throws ParseException
-	 */
-	public static void main(String[] args) throws UnknownHostException, IOException, ParseException
-	{
-		client = new HttpClient();
-		
-		if(args.length<3 || args.length>4)
-		{
-			System.out.println("incorrect number of command line arguments, expected 3 or 4, there were "+args.length);
-			System.exit(-1);
-		}
-		try {
-			setUrlString(args[0]);
-		} catch (MalformedURLException e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
-		}
-		storePath = args[1];
-		maxSize = Long.parseLong(args[2])*1000000;
-		if(args.length==4)
-			maxNumFiles = Integer.parseInt(args[3]);
-		else
-			maxNumFiles = -1;
-		
-		DBWrapper wrapper = new DBWrapper(storePath);
-		System.out.println("clearing queue of links from previous crawl");
-		clearQueue();
-		UrlForQueue urlForQueue = new UrlForQueue(Long.valueOf(0), startUrlString);
-		DBWrapper.storeUrlForQueue(urlForQueue);
-		urlToUrlList = new HashMap<String, ArrayList<String>>();
-		/*For testing db connection between servlet and crawler
-		 * User newUser = new User("test", "pass");
-		DBWrapper.storeUser(newUser);
-		System.out.println("password: "+DBWrapper.getUser("test").getPassword());
-		Channel channel = new Channel();
-		channel.setName("first channel");
-		DBWrapper.storeChannel(channel);
-		System.out.println("channel name stored is: "+DBWrapper.getChannel("first channel").getName());
-		 */
 
-		//TODO add first url to head queue
-		
-		//Create thread pools to run the crawler
-		Thread[] headPool = new Thread[10];
-		Thread[] getPool = new Thread[10];
-		for (int i = 0; i < 10; i++) {
-			headPool[i] = new Thread(new HeadThreadRunnable());
-			headPool[i].start();
-			getPool[i] = new Thread(new GetThreadRunnable());
-			getPool[i].start();
-		}
-		
-		//TODO WILL NOT need code below after threads are implemented
-		try {
-			startCrawling();
-			System.out.println("num crawled: "+numCrawled);
-			System.out.println("clearing queue for next crawl");
-			clearQueue();
-		} catch (SAXException | ParserConfigurationException e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
-		}	
-
-		//add a shutdown hook to properly close DB
-		Runtime.getRuntime().addShutdownHook(new Thread() {
-			public void run() {
-				DBWrapper.close();
-				shutdown = true;
-				System.out.println("Proper Shutdown.");
-			}
-		});
-	}
 	public static void processHead(String url) throws MalformedURLException, UnsupportedEncodingException
 	{
 		if(url == null)
@@ -915,25 +844,23 @@ public class XPathCrawler {
 		boolean downloaded = robotsTxtHandler(currentUrl);
 		
 		RobotsTxtInfo robotsInfo = DBWrapper.getRobotsInfo(getBaseUrl(currentUrl));
-		int crawlDelay = getCrawlDelay(robotsInfo);
-		if(downloaded && checkRobotsDirectives(currentUrl, robotsInfo))
+		boolean canCrawl = checkRobotsDirectives(currentUrl, robotsInfo);
+		if(downloaded && canCrawl)
 		{
-			addToHeadQueue(crawlDelay, currentUrl);
+			System.out.println("robots.txt downloaded and can crawl site, adding url: "+currentUrl+" to Head queue");
+			addToHeadQueue(currentUrl);
 		}
-		else{
+		else if(!downloaded && canCrawl){
 			//robots.txt was not downloaded because not the first time this host has been seen
+			System.out.println("robots.txt already downloaded");
+			int crawlDelay = getCrawlDelay(robotsInfo);
+			addToGetQueue(crawlDelay, currentUrl);
 			
 		}
-		
-		if(robotsInfo==null||checkRobotsDirectives(currentUrl, robotsInfo))
+		else
 		{
-			//System.out.println("url can be crawled: "+ currentUrl.toString());
-			
-			
+			System.out.println("can't crawl this url: "+ currentUrl);
 		}
-		
-		
-		
 	}
 	private static int getCrawlDelay(RobotsTxtInfo robotsInfo)
 	{
@@ -948,10 +875,7 @@ public class XPathCrawler {
 			else
 				crawlDelay = 1;
 		}
-		else
-		{
-			crawlDelay = 1;
-		}
+		System.out.println("XpathCrawler getCrawlDelay. crawl delay is: "+crawlDelay);
 		return crawlDelay;
 	}
 	public static void processGet(String url) throws IOException
@@ -983,6 +907,7 @@ public class XPathCrawler {
 	 */
 	static class HeadThreadRunnable implements Runnable {	
     	public void run() {
+    		System.out.println("head thread started, shutdown is: "+ shutdown);
     		while (!shutdown) { //this is to keep the thread alive and not return
         		String url = null;
 				try {
@@ -1011,7 +936,9 @@ public class XPathCrawler {
 	 * updates channels if necessary.
 	 */
 	static class GetThreadRunnable implements Runnable {
+		
 		public void run() {
+			System.out.println("get thread started, shutdown is: "+ shutdown);
 			while (!shutdown) { //this is to keep the thread alive and not return
 				String url = null;
 				try {
@@ -1049,5 +976,78 @@ public class XPathCrawler {
 		Tuple tups = DBWrapper.getNextOnHeadQueue();
 		System.out.println(tups.toString());
 		System.out.println(DBWrapper.getNextOnHeadQueue().toString());
+	}
+	/**
+	 * takes in 3-4 command line arguments to initialize the crawler and its constraints.
+	 * @param args
+	 * @throws UnknownHostException
+	 * @throws IOException
+	 * @throws ParseException
+	 */
+	public static void main(String[] args) throws UnknownHostException, IOException, ParseException
+	{
+		client = new HttpClient();
+		
+		if(args.length<3 || args.length>4)
+		{
+			System.out.println("incorrect number of command line arguments, expected 3 or 4, there were "+args.length);
+			System.exit(-1);
+		}
+		try {
+			setUrlString(args[0]);
+		} catch (MalformedURLException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+		storePath = args[1];
+		maxSize = Long.parseLong(args[2])*1000000;
+		if(args.length==4)
+			maxNumFiles = Integer.parseInt(args[3]);
+		else
+			maxNumFiles = -1;
+		
+		DBWrapper wrapper = new DBWrapper(storePath);
+		System.out.println("clearing queue of links from previous crawl");
+		clearQueue();
+		addToHeadQueue(new URL(startUrlString));
+		
+		/*old way of putting on queue
+		UrlForQueue urlForQueue = new UrlForQueue(Long.valueOf(0), startUrlString);
+		DBWrapper.storeUrlForQueue(urlForQueue);
+		*/
+		urlToUrlList = new HashMap<String, ArrayList<String>>();
+		/*For testing db connection between servlet and crawler
+		 * User newUser = new User("test", "pass");
+		DBWrapper.storeUser(newUser);
+		System.out.println("password: "+DBWrapper.getUser("test").getPassword());
+		Channel channel = new Channel();
+		channel.setName("first channel");
+		DBWrapper.storeChannel(channel);
+		System.out.println("channel name stored is: "+DBWrapper.getChannel("first channel").getName());
+		 */
+
+		//TODO add first url to head queue
+		
+		//Create thread pools to run the crawler
+		Thread[] headPool = new Thread[10];
+		Thread[] getPool = new Thread[10];
+		for (int i = 0; i < 10; i++) {
+			headPool[i] = new Thread(new HeadThreadRunnable());
+			headPool[i].start();
+			getPool[i] = new Thread(new GetThreadRunnable());
+			getPool[i].start();
+		}
+		
+		//WILL NOT need code below after threads are implemented
+		/*try {
+			//startCrawling();
+			//System.out.println("num crawled: "+numCrawled);
+			//System.out.println("clearing queue for next crawl");
+			//TODO write a way to clear the get and head queue when wanted
+			//clearQueue();
+		} catch (SAXException | ParserConfigurationException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}*/	
 	}
 }

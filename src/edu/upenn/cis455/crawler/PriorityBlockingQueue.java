@@ -19,17 +19,19 @@ public class PriorityBlockingQueue {
 	private final Database queueDB;
 	private int counter;
 	private int cacheSize;
+	private boolean head;
 	/**
 	 * Creates instance of queue
 	 * 
 	 * @param config queueDB	Database for queue
 	 * @param dbConfig			Database Config for all of the Berkeley DB for the crawler
 	 */
-	public PriorityBlockingQueue(Database queueDatabase, final int cacheSize)
+	public PriorityBlockingQueue(Database queueDatabase, final int cacheSize, boolean head)
 	{
 		queueDB = queueDatabase;
 		counter = 0;
 		this.cacheSize = cacheSize;
+		this.head = head;
 	}
 	public boolean isEmpty()
 	{
@@ -67,7 +69,7 @@ public class PriorityBlockingQueue {
 				}
 			
 				Tuple result = new Tuple(key.getData());
-				System.out.println("In PULL key: left: "+result.left+" right: "+ result.right);
+				System.out.println("In "+ (this.head?"HEAD:":"GET:")+" PULL key: left: "+result.left+" right: "+ result.right);
 				cursor.delete();
 				counter++;
 				if(counter >= cacheSize)
@@ -86,7 +88,7 @@ public class PriorityBlockingQueue {
 	{
 		final DatabaseEntry newKey = new DatabaseEntry(urlAndDate.toByteArray());
 		final DatabaseEntry newValue = new DatabaseEntry(urlValue.getBytes());
-		System.out.println("in PUSH tuple = "+urlAndDate.left.toString()+" "+urlAndDate.right);
+		System.out.println("in "+ (this.head?"HEAD:":"GET:")+" PUSH tuple = "+urlAndDate.left.toString()+" "+urlAndDate.right);
 		synchronized(queueDB)
 		{
 			queueDB.put(null, newKey, newValue);

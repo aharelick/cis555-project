@@ -1037,7 +1037,16 @@ public class XPathCrawler {
 			getPool[i] = new Thread(new GetThreadRunnable());
 			getPool[i].start();
 		}
-		
+
+		//add a shutdown hook to properly close DB
+		Runtime.getRuntime().addShutdownHook(new Thread() {
+			public void run() {
+				DBWrapper.close();
+				shutdown = true;
+				System.out.println("Proper Shutdown.");
+			}
+		});
+
 		//WILL NOT need code below after threads are implemented
 		/*try {
 			//startCrawling();

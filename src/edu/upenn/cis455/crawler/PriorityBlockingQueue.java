@@ -69,7 +69,7 @@ public class PriorityBlockingQueue {
 			
 				Tuple result = new Tuple(key.getData());
 				System.out.println("In "+ (this.head?"HEAD:":"GET:")+" PULL key: left: "+result.left+" right: "+ result.right);
-				cursor.delete();
+				OperationStatus op = cursor.delete();				
 				counter++;
 				if(counter >= cacheSize)
 				{

@@ -667,6 +667,7 @@ public class XPathCrawler {
 		RobotsTxtInfo robotsInfo = DBWrapper.getRobotsInfo(getBaseUrl(currentUrl));
 		int crawlDelay = getCrawlDelay(robotsInfo);
 		ServerFutureCrawlTime futureTime = DBWrapper.getServerFutureCrawlTime(currentUrl.getHost());
+		System.out.println(futureTime);
 		//if not null, this host name has been crawled at least once before
 		long futureTimeToCrawl = System.currentTimeMillis();
 		if(futureTime != null)

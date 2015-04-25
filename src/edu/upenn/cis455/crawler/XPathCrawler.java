@@ -872,15 +872,22 @@ public class XPathCrawler {
 		
 		RobotsTxtInfo robotsInfo = DBWrapper.getRobotsInfo(getBaseUrl(currentUrl));
 		boolean canCrawl = checkRobotsDirectives(currentUrl, robotsInfo);
+		//robots.txt just downloaded so add back to head queue to send head request next time
 		if(downloaded && canCrawl)
 		{
 			System.out.println("robots.txt downloaded and can crawl site, adding url: "+currentUrl+" to Head queue");
 			addToHeadQueue(currentUrl);
 		}
+		//robots.txt previously downloaded, so go ahead and crawl
 		else if(!downloaded && canCrawl){
 			//robots.txt was not downloaded because not the first time this host has been seen
 			int crawlDelay = getCrawlDelay(robotsInfo);
-			addToGetQueue(crawlDelay, currentUrl);
+			try {
+				headRequestHandler(currentUrl, crawlDelay);
+			} catch (SAXException | ParserConfigurationException | IOException e) {
+				// TODO Auto-generated catch block
+				e.printStackTrace();
+			}
 			
 		}
 		else

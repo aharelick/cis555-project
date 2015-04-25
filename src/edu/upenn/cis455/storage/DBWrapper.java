@@ -86,8 +86,8 @@ public class DBWrapper {
         queueDBConfig.setBtreeComparator(new QueueComparator());
         
         queueDB = myEnv.openDatabase(null,  "queueDB", queueDBConfig);
-        headQueue = new PriorityBlockingQueue(queueDB, 0);
-        getQueue = new PriorityBlockingQueue(queueDB, 0);
+        headQueue = new PriorityBlockingQueue(queueDB, 0, true);
+        getQueue = new PriorityBlockingQueue(queueDB, 0, false);
         
         System.out.println("Database Started");
 	}

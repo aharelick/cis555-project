@@ -16,6 +16,8 @@ import java.util.ArrayList;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Timer;
+import java.util.TimerTask;
 
 import javax.xml.parsers.ParserConfigurationException;
 
@@ -647,8 +649,9 @@ public class XPathCrawler {
 		{
 			futureTimeToCrawl = futureTime.getFutureCrawlTime();
 			
-			futureTimeToCrawl += crawlDelay; 
+			futureTimeToCrawl += crawlDelay*1000; 
 		}
+		System.out.println(futureTimeToCrawl);
 		ServerFutureCrawlTime futureCrawlTime = new ServerFutureCrawlTime(currentUrl.getHost(), futureTimeToCrawl);
 		DBWrapper.storeServerFutureCrawlTime(futureCrawlTime);
 		
@@ -667,13 +670,14 @@ public class XPathCrawler {
 		RobotsTxtInfo robotsInfo = DBWrapper.getRobotsInfo(getBaseUrl(currentUrl));
 		int crawlDelay = getCrawlDelay(robotsInfo);
 		ServerFutureCrawlTime futureTime = DBWrapper.getServerFutureCrawlTime(currentUrl.getHost());
+		
 		//if not null, this host name has been crawled at least once before
 		long futureTimeToCrawl = System.currentTimeMillis();
 		if(futureTime != null)
 		{
 			futureTimeToCrawl = futureTime.getFutureCrawlTime();
 			
-			futureTimeToCrawl += crawlDelay; 
+			futureTimeToCrawl += crawlDelay*1000; 
 		}
 		ServerFutureCrawlTime futureCrawlTime = new ServerFutureCrawlTime(currentUrl.getHost(), futureTimeToCrawl);
 		DBWrapper.storeServerFutureCrawlTime(futureCrawlTime);
@@ -880,8 +884,6 @@ public class XPathCrawler {
 		//robots.txt previously downloaded, so go ahead and crawl
 		else if(!downloaded && canCrawl){
 			//robots.txt was not downloaded because not the first time this host has been seen
-			System.out.println("robots.txt already downloaded");
-			
 			int crawlDelay = getCrawlDelay(robotsInfo);
 			try {
 				headRequestHandler(currentUrl, crawlDelay);
@@ -941,7 +943,6 @@ public class XPathCrawler {
 	 */
 	static class HeadThreadRunnable implements Runnable {	
     	public void run() {
-    		System.out.println("head thread started, shutdown is: "+ shutdown);
     		while (!shutdown) { //this is to keep the thread alive and not return
         		String url = null;
 				try {
@@ -972,7 +973,6 @@ public class XPathCrawler {
 	static class GetThreadRunnable implements Runnable {
 		
 		public void run() {
-			System.out.println("get thread started, shutdown is: "+ shutdown);
 			while (!shutdown) { //this is to keep the thread alive and not return
 				String url = null;
 				try {
@@ -1010,6 +1010,13 @@ public class XPathCrawler {
 		Tuple tups = DBWrapper.getNextOnHeadQueue();
 		System.out.println(tups.toString());
 		System.out.println(DBWrapper.getNextOnHeadQueue().toString());
+	}
+	
+	static class S3WritingTask extends TimerTask {		
+		public void run() {
+			//every 10 minutes write to S3
+			
+		}
 	}
 	/**
 	 * takes in 3-4 command line arguments to initialize the crawler and its constraints.
@@ -1061,8 +1068,6 @@ public class XPathCrawler {
 		DBWrapper.storeChannel(channel);
 		System.out.println("channel name stored is: "+DBWrapper.getChannel("first channel").getName());
 		 */
-
-		//TODO add first url to head queue
 		
 		//Create thread pools to run the crawler
 		Thread[] headPool = new Thread[10];
@@ -1074,6 +1079,11 @@ public class XPathCrawler {
 			getPool[i].start();
 		}
 
+		TimerTask s3WritingTask = new S3WritingTask();
+		Timer s3Handler = new Timer(true);
+		//wait 30 seconds to start, try every 30 seconds
+		s3Handler.scheduleAtFixedRate(s3WritingTask, 30000, 30000);
+		
 		//add a shutdown hook to properly close DB
 		Runtime.getRuntime().addShutdownHook(new Thread() {
 			public void run() {

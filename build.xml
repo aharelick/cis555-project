@@ -1,0 +1,58 @@
+<project name="HypeEngine" default="all" basedir="./">
+  <target name="init">
+    <mkdir dir="target/WEB-INF/classes"/>
+    <mkdir dir="classes"/>
+  </target>
+  
+  <!--target name="compile" depends="init">
+    <javac srcdir="src" destdir="classes" includes="edu/upenn.cis455/ui/*.java" deprecation="on"
+     debug="true" includeantruntime="false" classpath="classes">
+       <compilerarg value="-Xlint"/>
+    </javac>
+  </target-->
+  
+  <target name="compile" depends="init">
+    <javac srcdir="src/edu/upenn/cis455/ui/" destdir="target/WEB-INF/classes" includes="*.java" deprecation="on"
+     debug="true" includeantruntime="false">
+    	<classpath>
+			<fileset dir="lib/" >
+				<include name="**/*.jar" />
+			</fileset>
+    	</classpath>
+       <compilerarg value="-Xlint"/>
+    </javac>
+  </target>
+
+  <target name="all" depends="war, compile"/>
+  
+  <target name="war" depends="compile">
+    <copy file="conf/web.xml" tofile="target/WEB-INF/web.xml" overwrite="true" />
+  	<copy todir="target/WEB-INF/lib" overwrite="true">
+        <fileset dir="lib">
+            <include name="*.jar"/>
+        </fileset>
+	</copy>
+  	<copy todir="target/" overwrite="true">
+  	        <fileset dir="www">
+  	            <include name="**"/>
+  	        </fileset>
+  		</copy>
+    <jar destfile="ui.war">
+      <fileset dir="target/" includes="WEB-INF/classes/**/*.class"/>
+      <fileset dir="target/" includes="WEB-INF/lib/*.jar"/>
+      <fileset dir="target/" includes="WEB-INF/*.xml"/>
+    </jar>
+  </target>
+  
+  <target name="pack" description="Create an archive for submission">
+    <zip destfile="project-ui.zip">
+      <zipfileset dir="." excludes="target/**,**/*.class,submit-hw3.zip,master.war,worker*.war"/>
+    </zip>
+  </target>
+  
+  <target name="clean">
+    <delete dir="target/WEB-INF/classes"/>
+    <delete dir="classes"/>
+    <delete file="ui.war"/>
+  </target>
+</project>

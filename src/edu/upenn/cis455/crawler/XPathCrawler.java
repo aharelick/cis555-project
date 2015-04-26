@@ -59,6 +59,7 @@ public class XPathCrawler {
 	private static UrlForQueue firstUrlForQueue;
 	private static HashMap<String, ArrayList<String>> urlToUrlList;
 	private static boolean shutdown = false;
+	private static File directory;
 	//private static BlockingQueue<URL> urlFrontierQueue;
 	/**
 	 * Default Constructor. Not used in practice. Just for testing from Servlet in beginning.
@@ -791,7 +792,7 @@ public class XPathCrawler {
 	private static void getLinksFromJsoupDoc(org.jsoup.nodes.Document doc, URL currentUrl) throws MalformedURLException
 	{
 		Elements links = doc.select("a[href]");
-		ArrayList<String> allLinks = new ArrayList(); 
+		ArrayList<String> allLinks = new ArrayList<String>(); 
 		for(Element link: links)
 		{
 			System.out.println("link: "+link.attr("href") + " link text: "+link.text());
@@ -813,14 +814,17 @@ public class XPathCrawler {
 			long currentIndex = lastIndex+1;
 			Tuple tupleForQueue = new Tuple(new Date(), absoluteUrl);
 			addToHeadQueue(new URL(absoluteUrl));
+			allLinks.add(absoluteUrl);
 			/*
 			 * old way to add to queue
 			 * UrlForQueue urlForQueue = new UrlForQueue(currentIndex, absoluteUrl);
-			allLinks.add(absoluteUrl);
+			
 			DBWrapper.storeUrlForQueue(urlForQueue);
 			 */
 		} 
 		urlToUrlList.put(currentUrl.toString(), allLinks);
+		String line = S3FileWriter.prepareFileLineUrlList(currentUrl.toString(), allLinks);
+		S3FileWriter.writeToUrlFile(line);
 		
 	}
 	/**
@@ -919,6 +923,10 @@ public class XPathCrawler {
 		GenericTuple<String, String> tuple = client.getDocument(url);
 		String contentType = tuple.left;
 		String retrievedDocument = tuple.right;
+		if (isHTML(contentType, new URL(url))) {
+			String line = S3FileWriter.prepareFileLineDoc(url, retrievedDocument);
+			S3FileWriter.writeToDocFile(line);
+		}
 		parseDocument(retrievedDocument, contentType, new URL(url), null, null);
 		/*
 		 * //check if is past crawlDelay
@@ -1015,9 +1023,10 @@ public class XPathCrawler {
 	static class S3WritingTask extends TimerTask {		
 		public void run() {
 			//every 10 minutes write to S3
-			
+			S3FileWriter.switchFileAndWriteToS3(directory);		
 		}
 	}
+	
 	/**
 	 * takes in 3-4 command line arguments to initialize the crawler and its constraints.
 	 * @param args
@@ -1029,9 +1038,9 @@ public class XPathCrawler {
 	{
 		client = new HttpClient();
 		
-		if(args.length<3 || args.length>4)
+		if(args.length<4 || args.length>5)
 		{
-			System.out.println("incorrect number of command line arguments, expected 3 or 4, there were "+args.length);
+			System.out.println("incorrect number of command line arguments, expected 4 or 5, there were "+args.length);
 			System.exit(-1);
 		}
 		try {
@@ -1046,6 +1055,12 @@ public class XPathCrawler {
 			maxNumFiles = Integer.parseInt(args[3]);
 		else
 			maxNumFiles = -1;
+		
+		
+		//set the filewriter for logging for S3 
+		directory = new File(args[4]);
+		S3FileWriter.setDocFileWriter(directory);
+		S3FileWriter.setUrlFileWriter(directory);
 		
 		DBWrapper wrapper = new DBWrapper(storePath);
 		System.out.println("clearing queue of links from previous crawl");

@@ -21,12 +21,20 @@ public class Corpus {
 		
 		Set<String> terms = tf.keySet();
 		for (String term : terms) {
+			if (term.equals("ISIS")) System.out.println("WE HERE");
 			Term dbTerm = DBWrapperIndexer.getTerm(term);
+			if (dbTerm == null) {
+				dbTerm = new Term(term);
+			}
 			double freq = tf.get(term);
 			LinkedList<Integer> termLoc = loc.get(term);
+			if (term.equals("ISIS")) {
+				System.out.println("URL: " + url);
+				System.out.println("FREQ: " + freq);
+			}
 			dbTerm.addFrequency(url, freq);
 			dbTerm.addLocationList(url, termLoc);
-			DBWrapperIndexer.putTerm(dbTerm);
+			DBWrapperIndexer.sync();
 		}
 		
 	}

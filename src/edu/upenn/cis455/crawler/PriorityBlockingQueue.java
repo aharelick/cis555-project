@@ -64,7 +64,6 @@ public class PriorityBlockingQueue {
 					queueDB.wait();
 				}
 				
-				
 				if(value.getData() == null)
 				{
 					System.out.println("value of data is null");
@@ -73,7 +72,7 @@ public class PriorityBlockingQueue {
 			
 				Tuple result = new Tuple(key.getData());
 				System.out.println("In "+ (this.head?"HEAD:":"GET:")+" PULL key: left: "+result.left+" right: "+ result.right);
-				cursor.delete();
+				OperationStatus op = cursor.delete();				
 				counter++;
 				if(counter >= cacheSize)
 				{
@@ -91,7 +90,9 @@ public class PriorityBlockingQueue {
 	{
 		final DatabaseEntry newKey = new DatabaseEntry(urlAndDate.toByteArray());
 		final DatabaseEntry newValue = new DatabaseEntry(urlValue.getBytes());
+
 		System.out.println("in "+ (this.head?"HEAD:":"GET:")+" PUSH tuple = "+urlAndDate.left.toString()+" "+urlAndDate.right);
+
 		synchronized(queueDB)
 		{
 			queueDB.put(null, newKey, newValue);

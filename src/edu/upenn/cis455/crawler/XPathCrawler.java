@@ -813,7 +813,6 @@ public class XPathCrawler {
 	}
 	
 	static class ListenerRunnable implements Runnable {
-
 		public void run() {
 			try (
 				ServerSocket serverSocket = new ServerSocket(portNumber, 1000);	
@@ -871,7 +870,11 @@ public class XPathCrawler {
 		S3FileWriter.setUrlFileWriter(directory);
 		
 		DBWrapper wrapper = new DBWrapper(storePath);
-		addToHeadQueue(new URL(startUrlString));
+		addToHeadQueue(new URL("http://www.dmoz.org"));
+		addToHeadQueue(new URL("http://www.wikipedia.org/Philosophy"));
+		addToHeadQueue(new URL("http://www.reddit.com"));
+		addToHeadQueue(new URL("http://www.yahoo.com"));
+		addToHeadQueue(new URL("http://www.nytimes.com"));	
 		
 		urlToUrlList = new HashMap<String, ArrayList<String>>();
 		

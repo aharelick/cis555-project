@@ -1,17 +1,17 @@
 package edu.upenn.cis455.crawler;
 
 import java.io.BufferedReader;
-import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.io.IOException;
 import java.io.StringReader;
 import java.io.UnsupportedEncodingException;
 import java.net.MalformedURLException;
+import java.net.ServerSocket;
+import java.net.Socket;
 import java.net.URL;
 import java.net.URLDecoder;
 import java.net.UnknownHostException;
 import java.text.ParseException;
-import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.HashMap;
@@ -23,93 +23,51 @@ import javax.xml.parsers.ParserConfigurationException;
 
 import org.jsoup.Jsoup;
 import org.jsoup.nodes.Element;
-import org.jsoup.parser.Parser;
 import org.jsoup.select.Elements;
 import org.xml.sax.SAXException;
 
-import com.sleepycat.persist.EntityCursor;
-
 import edu.upenn.cis455.crawler.RobotsTxtInfo;
 import edu.upenn.cis455.crawler.HttpClient;
-import edu.upenn.cis455.storage.Channel;
 import edu.upenn.cis455.storage.DBWrapper;
 import edu.upenn.cis455.storage.DocumentLastCrawlTime;
 import edu.upenn.cis455.storage.HtmlDoc;
 import edu.upenn.cis455.storage.ServerFutureCrawlTime;
 import edu.upenn.cis455.storage.UrlForQueue;
 import edu.upenn.cis455.storage.XmlDoc;
-import edu.upenn.cis455.xpathengine.DOMBuilder;
-import edu.upenn.cis455.xpathengine.XPathEngineFactory;
-import edu.upenn.cis455.xpathengine.XPathEngineImpl;
 
 /**
- * run via main method, it has a starting url and crawls all links to HTML and XML Documents, storing them, adding the XML files 
- * to channels where the document matches one of the XPaths of the channel, etc.
- * @author Kelsey Duncombe-Smith
- *
+ * Run via main method, it has a starting URL and crawls all links to HTML 
+ * and XML Documents reached from that start URL
+ * @author Kelsey Duncombe-Smith, Mark Harding
  */
 public class XPathCrawler {
-	private static String startUrlString =  "https://dbappserv.cis.upenn.edu/crawltest.html";
-	//private static URL startUrl;
+	private static String startUrlString = "https://dbappserv.cis.upenn.edu/crawltest.html";
 	private static String storePath;
 	private static long maxSize;
 	private static int maxNumFiles;
-	private static int numCrawled =0;
+	private static int numCrawled = 0;
 	private static HttpClient client;
 	private static UrlForQueue firstUrlForQueue;
 	private static HashMap<String, ArrayList<String>> urlToUrlList;
 	private static boolean shutdown = false;
 	private static File directory;
-	//private static BlockingQueue<URL> urlFrontierQueue;
-	/**
-	 * Default Constructor. Not used in practice. Just for testing from Servlet in beginning.
-	 */
-	public XPathCrawler()
-	{
-		System.out.println("in xpathcrawler constructor");
-		 client = new HttpClient();
-		 
-		try {
-			maxNumFiles = 5;
-			numCrawled = 0;
-			UrlForQueue urlForQueue = new UrlForQueue(Long.valueOf(0), startUrlString);
-			setFirstItemInQueue(urlForQueue);
-			DBWrapper wrapper = new DBWrapper("/home/cis455/workspace/HW2/BDBStoreTest");
-			DBWrapper.storeUrlForQueue(urlForQueue);
-			try {
-				startCrawling();
-			} catch (SAXException | ParserConfigurationException e) {
-				// TODO Auto-generated catch block
-				e.printStackTrace();
-			}
-			//crawlDocument(startUrl);
-		} catch (IOException e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
-		} catch (ParseException e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
-		}
-	}
-	/**
-	 * sets the first item in the queue. typically the root url
-	 * @param first
-	 */
-	private static void setFirstItemInQueue(UrlForQueue first)
-	{
-		firstUrlForQueue= first;
-	}
+	private static int portNumber = 80;
+	private static MyBlockingQueue<Socket> requestQueue = 
+			new MyBlockingQueue<Socket>();
+	
+	
 	/**
 	 * returns the first item in the queue
 	 * for testing purposes
 	 * @return
 	 */
+	
 	public static UrlForQueue getFirstItemInQueue()
 	{
 		return firstUrlForQueue;
 	}
+	
 	/**
-	 * 
 	 * @param currentUrl
 	 * @returns a String representing the base url including port number of a url
 	 */
@@ -117,9 +75,10 @@ public class XPathCrawler {
 	{
 		return currentUrl.getProtocol()+"://"+currentUrl.getAuthority();
 	}
+	
 	/**
-	 * sends the HEAD request, if it's a 200 OK,
-	 * downloads the robots.txt file if it exists and parses it which stores it in the database
+	 * Sends the HEAD request, if it's a 200 OK, downloads the robots.txt file,
+	 * if it exists and parses it which stores it in the database.
 	 * @param currentUrl
 	 * @returns true if a robots.txt was downloaded and false otherwise
 	 */
@@ -129,14 +88,12 @@ public class XPathCrawler {
 		String robotsUrlString = baseUrl+"/"+"robots.txt";
 		if(DBWrapper.getRobotsInfo(baseUrl)!=null)
 		{
-			//System.out.println("robots.txt has already been downloaded and parsed");
 			return false;
 		}
 		URL robotsUrl = null;
 		try {
 			robotsUrl = new URL(robotsUrlString);
 		} catch (MalformedURLException e1) {
-			// TODO Auto-generated catch block
 			e1.printStackTrace();
 		}
 		HashMap<String, List<String>> headers;
@@ -145,11 +102,9 @@ public class XPathCrawler {
 		} catch (ParseException e) {
 			return false;
 		} catch (UnknownHostException e) {
-			// TODO Auto-generated catch block
 			e.printStackTrace();
 			return false;
 		} catch (IOException e) {
-			// TODO Auto-generated catch block
 			e.printStackTrace();
 			return false;
 		}
@@ -163,7 +118,6 @@ public class XPathCrawler {
 			} catch (ParseException e) {
 				return true;
 			} catch (IOException e) {
-				// TODO Auto-generated catch block
 				e.printStackTrace();
 				return true;
 			}
@@ -179,15 +133,17 @@ public class XPathCrawler {
 		}
 		return true;	
 	}
+	
 	/**
-	 * parses the robots.txt according to the different keywords. adding all implemented keywords to the robotsTxtInfo object
-	 * 
+	 * Parses the robots.txt according to the different keywords. Adding 
+	 * all implemented keywords to the robotsTxtInfo object. 
 	 * @param robotsUrl
 	 * @returns the robotsTxtInfo object with all the keywords parsed from the robots.txt
 	 * @throws IOException
 	 * @throws ParseException
 	 */
-	private static RobotsTxtInfo parseRobotsTxt(String robotsUrl) throws IOException, ParseException
+	private static RobotsTxtInfo parseRobotsTxt(String robotsUrl) 
+			throws IOException, ParseException
 	{
 		String retrievedDocument = client.getDocument(robotsUrl).right;
 		RobotsTxtInfo robotInfo = new RobotsTxtInfo();
@@ -195,7 +151,8 @@ public class XPathCrawler {
 		expectedKeywords.add("User-agent");
 		expectedKeywords.add("User-Agent");
 		expectedKeywords.add("user-agent");
-		BufferedReader in = new BufferedReader(new StringReader(retrievedDocument));
+		BufferedReader in = 
+				new BufferedReader(new StringReader(retrievedDocument));
 		String line = "";
 		String currentUserAgent = null;
 		while ((line=in.readLine())!=null)
@@ -207,7 +164,8 @@ public class XPathCrawler {
 			String keyword = tokens[0].trim();
 			if(expectedKeywords.contains(keyword))
 			{
-				if(keyword.equals("User-agent")||keyword.equals("User-Agent")||keyword.equals("user-agent"))
+				if(keyword.equals("User-agent")||keyword.equals("User-Agent")
+						||keyword.equals("user-agent"))
 				{
 					String userAgent = tokens[1].trim();
 					robotInfo.addUserAgent(userAgent);
@@ -231,7 +189,8 @@ public class XPathCrawler {
 					expectedKeywords.add("Crawl-delay");
 					expectedKeywords.add("Sitemap");
 					expectedKeywords.add("Host");
-					expectedKeywords.add("");//represents a new line b/c split will just make token[0]=""
+					//represents a new line b/c split will just make token[0]=""
+					expectedKeywords.add("");
 				}
 				else if(keyword.equals("Allow"))
 				{
@@ -244,13 +203,15 @@ public class XPathCrawler {
 					expectedKeywords.add("Crawl-delay");
 					expectedKeywords.add("Sitemap");
 					expectedKeywords.add("Host");
-					expectedKeywords.add("");//represents a new line b/c split will just make token[0]=""
+					//represents a new line b/c split will just make token[0]=""
+					expectedKeywords.add("");
 				
 				}
 				else if(keyword.equals("Crawl-delay"))
 				{
 					if(currentUserAgent!=null)
-						robotInfo.addCrawlDelay(currentUserAgent, Integer.parseInt(tokens[1].trim()));
+						robotInfo.addCrawlDelay(currentUserAgent, 
+								Integer.parseInt(tokens[1].trim()));
 					
 					expectedKeywords.clear();
 					expectedKeywords.add("Disallow");
@@ -258,7 +219,8 @@ public class XPathCrawler {
 					expectedKeywords.add("Crawl-delay");
 					expectedKeywords.add("Sitemap");
 					expectedKeywords.add("Host");
-					expectedKeywords.add("");//represents a new line b/c split will just make token[0]=""
+					//represents a new line b/c split will just make token[0]=""
+					expectedKeywords.add("");
 				
 				}
 				else if(keyword.equals(""))
@@ -279,91 +241,16 @@ public class XPathCrawler {
 		robotInfo.print();
 		return robotInfo;
 	}
+	
 	/**
-	 * starts crawling from the first object in the queue and continues crawling until the maximum number of allowed
-	 * files to be crawled has been reached or the queue is empty
-	 * @throws UnknownHostException
-	 * @throws IOException
-	 * @throws ParseException
-	 * @throws SAXException
-	 * @throws ParserConfigurationException
-	 */
-	@Deprecated
-	private static void startCrawling() throws UnknownHostException, IOException, ParseException, SAXException, ParserConfigurationException
-	{
-		//maxNumFiles == -1 means crawl infinitely
-		while(!DBWrapper.isQueueEmpty()&&(numCrawled<maxNumFiles||maxNumFiles==-1))
-		{
-			URL currentUrl = new URL(DBWrapper.removeUrlForQueue().getUrl());
-			robotsTxtHandler(currentUrl);
-			//if url can be crawled
-			RobotsTxtInfo robotsInfo = DBWrapper.getRobotsInfo(getBaseUrl(currentUrl));
-			if(robotsInfo==null||checkRobotsDirectives(currentUrl, robotsInfo))
-			{
-				//System.out.println("url can be crawled: "+ currentUrl.toString());
-				int crawlDelay = 1;
-				if(robotsInfo!=null)
-				{
-				
-					if(robotsInfo.crawlContainsUserAgent("cis455crawler"))
-						crawlDelay = robotsInfo.getCrawlDelay("cis455crawler");
-					else if(robotsInfo.crawlContainsUserAgent("*"))
-						crawlDelay = robotsInfo.getCrawlDelay("*");
-					else
-						crawlDelay = 1;
-				}
-				else
-				{
-					crawlDelay = 1;
-				}
-				//check if is past crawlDelay
-				if(hasWaitedCrawlDelay(currentUrl, crawlDelay))
-				{
-					System.out.println("server of url: "+currentUrl.toString()+" has waited crawl delay, crawlDelay was: "+crawlDelay);
-					headRequestHandler(currentUrl, crawlDelay);
-					//store last crawl time in DB
-					ServerFutureCrawlTime lastCrawlTime = new ServerFutureCrawlTime(getBaseUrl(currentUrl), System.currentTimeMillis());
-					DBWrapper.storeServerFutureCrawlTime(lastCrawlTime);
-				}
-				else
-				{
-					//System.out.println("server of url: "+currentUrl.toString()+" has NOT waited crawl delay, crawlDelay is "+crawlDelay);
-					UrlForQueue urlForQueue = new UrlForQueue(DBWrapper.getLastIndex()+1, currentUrl.toString());
-					DBWrapper.storeUrlForQueue(urlForQueue);
-				}
-			}
-			else
-				System.out.println("url CANNOT be crawled: "+ currentUrl.toString());
-		}
-	}
-	/**
-	 * checks if the server associated with the current url has been requested within the server's crawl delay
-	 * @param currentUrl
-	 * @param crawlDelay
-	 * @returns true if the time between last request and now is larger than the crawl delay. otherwise returns false
-	 */
-	private static boolean hasWaitedCrawlDelay(URL currentUrl, int crawlDelay)
-	{
-		//crawl delay is in seconds so it must be converted to milliseconds
-		long crawlDelayLong = crawlDelay*1000;
-		ServerFutureCrawlTime futureCrawlTime = DBWrapper.getServerFutureCrawlTime(currentUrl.getHost());
-
-		if(futureCrawlTime == null)//if is null then current server has never been crawled before so it has waited the crawl delay
-			return true;
-		
-		else if((System.currentTimeMillis()-futureCrawlTime.getFutureCrawlTime())>crawlDelayLong)
-			return true;
-		else
-			return false;
-	}
-	/**
-	 * checks if the url is one of the urls specified by the robots.txt directives
+	 * Checks if the url is one of the urls specified by the robots.txt directives
 	 * @param currentUrl
 	 * @param robotsInfo
 	 * @returns true if the url is allowed to be crawled, returns false otherwise
 	 * @throws UnsupportedEncodingException
 	 */
-	private static boolean checkRobotsDirectives(URL currentUrl, RobotsTxtInfo robotsInfo) throws UnsupportedEncodingException
+	private static boolean checkRobotsDirectives(URL currentUrl, 
+			RobotsTxtInfo robotsInfo) throws UnsupportedEncodingException
 	{
 		boolean allowed = true;
 		String matchedDisallowedPath = "";
@@ -380,21 +267,17 @@ public class XPathCrawler {
 			disallowedPaths = robotsInfo.getDisallowedLinks("*");
 		}
 		else
-		{//if there are no user-agent directives that match cis455crawler then the url is allowed
+		{//if no user-agent directives matching cis455crawler, url is allowed
 			return true;
-		}
-			
+		}	
 		char [] urlChars = currentUrl.getPath().toCharArray();
-		//System.out.println(urlChars);
 		if(disallowedPaths!=null)
 		{
 			for(String currentDisallowedPath : disallowedPaths)
 			{
-				//System.out.println("disallowed path = "+currentDisallowedPath);
 				char [] disallowedChars = currentDisallowedPath.toCharArray();
 				if(doPathsMatch(disallowedChars, urlChars))
 				{
-					System.out.println("paths matched");
 					matchedDisallowedPath = currentDisallowedPath;
 					allowed = false;
 					break;
@@ -406,9 +289,13 @@ public class XPathCrawler {
 			for(String currentAllowedPath : allowedPaths)
 			{
 				char [] allowedChars = currentAllowedPath.toCharArray();
-				if(doPathsMatch(allowedChars, urlChars)&& (matchedDisallowedPath.length()<currentAllowedPath.length()))
+				if(doPathsMatch(allowedChars, urlChars) && 
+						(matchedDisallowedPath.length()<currentAllowedPath.length()))
 				{
-					//the above condition works if there was no matchedDisallowedPath because empty string is shorter than any other string
+					/* The above condition works if there was no 
+					 * matchedDisallowedPath because empty string is shorter 
+					 * than any other string.
+					 */
 					allowed = true;
 					break;
 				}	
@@ -416,32 +303,36 @@ public class XPathCrawler {
 		}
 		return allowed;
 	}
+	
 	/**
-	 * checks if the path in the robots.txt matches the current url, parsing character by character
+	 * Checks if the path in the robots.txt matches the current url
+	 * parsing character by character.
 	 * @param disallowedChars
 	 * @param urlChars
 	 * @returns true if the paths match and false otherwise
 	 * @throws UnsupportedEncodingException
 	 */
-	private static boolean doPathsMatch(char [] disallowedChars, char [] urlChars) throws UnsupportedEncodingException
+	private static boolean doPathsMatch(char [] disallowedChars,
+			char [] urlChars) throws UnsupportedEncodingException
 	{
 		for(int i=0; i<disallowedChars.length; i++)
 		{
 			if(i==urlChars.length)
 			{
-				//if the urlCharArray is shorter than the dissallowed path char array then it is not a match
+				/*if urlCharArray shorter than the dissallowed path char array 
+				then it is not a match*/
 				return false;
 			}
-			//System.out.println("disallowed char: "+disallowedChars[i]+" url char: "+urlChars[i]);
+			
 			if(disallowedChars[i]==urlChars[i])
 			{
-				//System.out.println("disallowed char: "+disallowedChars[i]+" url char: "+urlChars[i]+" matched");
 				continue;
 			}
 			else if(disallowedChars[i]=='%')
 			{
-				System.out.println("contains %");
-				String encodedChar = Character.toString(disallowedChars[i])+Character.toString(disallowedChars[i+1])+Character.toString(disallowedChars[i+2]);
+				String encodedChar = Character.toString(disallowedChars[i]) +
+						Character.toString(disallowedChars[i+1]) + 
+						Character.toString(disallowedChars[i+2]);
 				String decodedChar = URLDecoder.decode(encodedChar, "UTF-8");
 				
 				if(!decodedChar.equals('/'))
@@ -452,9 +343,10 @@ public class XPathCrawler {
 						i+=2;
 				}
 				else{
-					/*if the encoded %_ _ decoded to '/' then it cannot be compared as a decoded string, 
-					and by this point if the % char matched the urlChar
-					it would not have reached this point in the code because of the continue above*/
+					/*if the encoded %_ _ decoded to '/' then it cannot be 
+					 * compared as a decoded string, and by this point if the %
+					 * char matched the urlChar it would not have reached this
+					 * point in the code because of the continue above*/
 					return false;
 				}
 			}
@@ -464,8 +356,9 @@ public class XPathCrawler {
 		//if it matched all the way through the char array then it is a match
 		return true;
 	}
+	
 	/**
-	 * checks if the current file has a contentType that denotes an XML document
+	 * Checks if the current file has a contentType that denotes an XML document
 	 * @param contentType
 	 * @param url
 	 * @returns true if contentType is an accepted xml content-type and false otherwise
@@ -518,12 +411,13 @@ public class XPathCrawler {
 	 * @throws ParserConfigurationException
 	 * @throws IOException
 	 */
-	private static void headRequestHandler(URL url, int crawlDelay) throws SAXException, ParserConfigurationException, IOException
+	private static void headRequestHandler(URL url, int crawlDelay) 
+			throws SAXException, ParserConfigurationException, IOException
 	{
 		//if the url has already been crawled this crawl then don't crawl it again
 		if(DBWrapper.urlHasBeenCrawled(url.toString()))
 		{
-			System.out.println("url has already been crawled this crawl. skipping");
+			System.out.println("URL has already been crawled this crawl. Skipping.");
 			return;
 		}
 		//send the HEAD request
@@ -531,11 +425,9 @@ public class XPathCrawler {
 		try {
 			headers = client.sendHead(url);
 		} catch (IOException e1) {
-			// TODO Auto-generated catch block
 			e1.printStackTrace();
 			return; 
 		} catch (ParseException e) {
-			// TODO Auto-generated catch block
 			e.printStackTrace();
 		}
 		
@@ -580,7 +472,7 @@ public class XPathCrawler {
 		String retrievedDocument = "";
 		if(responseCode.contains("304"))
 		{
-			System.out.println("304 not modified. use local copy of "+url.toString());
+			System.out.println("304 not modified. Use local copy of "+url.toString());
 			
 			xmlDoc = DBWrapper.getXmlDoc(url.toString());
 			if(xmlDoc!=null)
@@ -619,31 +511,20 @@ public class XPathCrawler {
 		{
 			//ADD to GET QUEUE
 			addToGetQueue(crawlDelay, url);
-			System.out.println("File was a 200, adding URL to get queue: "+url.toString());
-			/*
-			
-			try {
-				Thread.sleep(crawlDelay*1000);
-			} catch (InterruptedException e) {
-				// TODO Auto-generated catch block
-				e.printStackTrace();
-			}
-			retrievedDocument = client.getDocument(url.toString());
-			//store to mark as being crawled in this crawl
-			DBWrapper.storeUrlHasBeenCrawled(url.toString());
-			*/
+			System.out.println("File was a 200, adding URL to GET queue: "+url.toString());
 		}
 		else
 		{
-			System.out.println("File was not a 200, not downloading "+url.toString()+". Response was: "+responseCode);
+			System.out.println("File was not a 200, not downloading " 
+		+url.toString()+". Response was: "+responseCode);
 			return;
 		}		
-		//Document doc = DOMBuilder.jsoup2DOM(jsoupDoc);
-		//used to be parseDocument() here
 	}
+	
 	private static void addToGetQueue(int crawlDelay, URL currentUrl)
 	{
-		ServerFutureCrawlTime futureTime = DBWrapper.getServerFutureCrawlTime(currentUrl.getHost());
+		ServerFutureCrawlTime futureTime = DBWrapper.getServerFutureCrawlTime(
+				currentUrl.getHost());
 		//if not null, this host name has been crawled at least once before
 		long futureTimeToCrawl = System.currentTimeMillis();
 		if(futureTime != null)
@@ -662,7 +543,7 @@ public class XPathCrawler {
 		
 	}
 	/**
-	 * adds the specified url to the head queue and updates the server future crawl time
+	 * Adds the specified url to the head queue and updates the server future crawl time
 	 * @param crawlDelay
 	 * @param currentUrl
 	 */
@@ -670,7 +551,8 @@ public class XPathCrawler {
 	{
 		RobotsTxtInfo robotsInfo = DBWrapper.getRobotsInfo(getBaseUrl(currentUrl));
 		int crawlDelay = getCrawlDelay(robotsInfo);
-		ServerFutureCrawlTime futureTime = DBWrapper.getServerFutureCrawlTime(currentUrl.getHost());
+		ServerFutureCrawlTime futureTime = 
+				DBWrapper.getServerFutureCrawlTime(currentUrl.getHost());
 		
 		//if not null, this host name has been crawled at least once before
 		long futureTimeToCrawl = System.currentTimeMillis();
@@ -680,28 +562,29 @@ public class XPathCrawler {
 			
 			futureTimeToCrawl += crawlDelay*1000; 
 		}
-		ServerFutureCrawlTime futureCrawlTime = new ServerFutureCrawlTime(currentUrl.getHost(), futureTimeToCrawl);
+		//store next future crawl time in DB
+		ServerFutureCrawlTime futureCrawlTime = new ServerFutureCrawlTime(
+				currentUrl.getHost(), futureTimeToCrawl);
 		DBWrapper.storeServerFutureCrawlTime(futureCrawlTime);
 		
 		Tuple dateAndUrl = new Tuple(new Date(futureTimeToCrawl), currentUrl.toString());
-		DBWrapper.putOnHeadQueue(dateAndUrl, currentUrl.toString());
-		//store next future crawl time in DB
-		
+		DBWrapper.putOnHeadQueue(dateAndUrl, currentUrl.toString());	
 	}
+	
 	/**
-	 * parses a downloaded or locally stored document and adds the links to the head queue
+	 * Parses a downloaded or locally stored document and adds the links to the head queue
 	 * @param retrievedDocument
 	 * @param contentType
 	 * @param url
 	 * @param htmlDoc
 	 * @param xmlDoc
 	 */
-	private static void parseDocument(String retrievedDocument, String contentType, URL url, HtmlDoc htmlDoc, XmlDoc xmlDoc)
+	private static void parseDocument(String retrievedDocument,
+			String contentType, URL url, HtmlDoc htmlDoc, XmlDoc xmlDoc)
 	{
-		SimpleDateFormat format = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss");
 		Date currentDate = new Date();
-		String dateString = format.format(currentDate);
-		DocumentLastCrawlTime lastCrawlTime= new DocumentLastCrawlTime(url.toString(), currentDate);
+		DocumentLastCrawlTime lastCrawlTime= new DocumentLastCrawlTime(
+				url.toString(), currentDate);
 		DBWrapper.storeDocumentLastCrawlTime(lastCrawlTime);
 		numCrawled++;
 		
@@ -711,7 +594,6 @@ public class XPathCrawler {
 			try {
 				getLinksFromJsoupDoc(jsoupDoc, url);
 			} catch (MalformedURLException e) {
-				// TODO Auto-generated catch block
 				e.printStackTrace();
 				return;
 			}
@@ -719,77 +601,27 @@ public class XPathCrawler {
 			DBWrapper.storeHtmlDoc(html);
 			
 		}
-		if(isXML(contentType, url)||xmlDoc!=null)
+		
+		/*if(isXML(contentType, url)||xmlDoc!=null)
 		{
 			//make document
 			org.jsoup.nodes.Document doc = Jsoup.parse(retrievedDocument, "", Parser.xmlParser());
-			/*DocumentBuilderFactory dbf = DocumentBuilderFactory.newInstance();
-			DocumentBuilder db = dbf.newDocumentBuilder();
-			//System.out.println("retrieved Document = "+retrievedDocument);
-			ByteArrayInputStream bis = new ByteArrayInputStream(retrievedDocument.getBytes());
-			Document doc = db.parse(bis);*/
-			
-			XmlDoc xml = new XmlDoc(url.toString(), retrievedDocument);
-			DBWrapper.storeXmlDoc(xml);
-			
-			EntityCursor<Channel> channelCursor = DBWrapper.getAllChannels();
-			ArrayList<Channel> channelsList = getChannelsList(channelCursor);
-			for(Channel channel : channelsList)
-			{
-		    	 //System.out.println("current channel is:"+channel.getName());
-		    	 String [] xpaths = channel.getXPaths();
-		    	 XPathEngineImpl xpathEngine = (XPathEngineImpl) XPathEngineFactory.getXPathEngine();
-		    	 if(xpaths!=null&&xpaths.length>0)
-		    	 {
-		    		 xpathEngine.setXPaths(xpaths);
-			    	 boolean [] evaluateResults = xpathEngine.evaluate(DOMBuilder.jsoup2DOM(doc));
-			    	 for(int i=0; i<evaluateResults.length; i++)
-			    	 {
-			    		 if(evaluateResults[i]==true&&xpathEngine.isValid(i))
-			    		 {
-			    			 //if one xpath evaluated to true and the xpath is valid
-			    			 //then add the xml to the channel, no need to go through the rest of the xpaths
-			    			 System.out.println("added XML File: "+url.toString()+" to Channel: "+channel.getName());
-			    			 channel.addXMLFile(url.toString(), retrievedDocument);
-			    			 DBWrapper.storeChannel(channel);
-			    			 break;
-			    		 }
-			    	 }
-		    	 }
-		     }
-
-		}
+		}*/
+		
 		//store to mark as being crawled in this crawl
 		DBWrapper.storeUrlHasBeenCrawled(url.toString());
 	}
+	
 	/**
-	 * Iterates through the EntityCursor of Channels to retrieve a list of all channels
-	 * @param channelCursor
-	 * @returns an ArrayList of Channels
-	 */
-	private static ArrayList<Channel> getChannelsList(EntityCursor<Channel>channelCursor)
-	{
-		ArrayList<Channel> channelList = new ArrayList<Channel>();
-		try {
-			 //channelCursor.first();
-			 //System.out.println("There are currently x channels where x = "+channelCursor.count());
-		     for (Channel channel = channelCursor.first(); channel != null; channel = channelCursor.next())
-		     {
-		    	 channelList.add(channel);
-		     }
-		 } finally {
-		     channelCursor.close();
-		 }
-		return channelList;
-	}
-	/**
-	 * gets all links from an HTML document using the jsoup DOM Document. All links are added to the queue
+	 * Gets all links from an HTML document using the jsoup DOM Document.
+	 * All links are added to the queue.
 	 * @param doc
 	 * @param currentUrl
 	 * @param htmlDoc
 	 * @throws MalformedURLException
 	 */
-	private static void getLinksFromJsoupDoc(org.jsoup.nodes.Document doc, URL currentUrl) throws MalformedURLException
+	private static void getLinksFromJsoupDoc(org.jsoup.nodes.Document doc,
+			URL currentUrl) throws MalformedURLException
 	{
 		Elements links = doc.select("a[href]");
 		ArrayList<String> allLinks = new ArrayList<String>(); 
@@ -805,22 +637,16 @@ public class XPathCrawler {
 				String [] tokens = currentUrl.toString().trim().split("/");
 				if(tokens[tokens.length-1].contains("."))
 				{
-					absoluteUrl = currentUrl.toString().substring(0, currentUrl.toString().lastIndexOf("/"))+(currentUrl.toString().endsWith("/")?"":"/")+linkpath;
+					absoluteUrl = currentUrl.toString().substring(0,
+							currentUrl.toString().lastIndexOf("/")) +
+							(currentUrl.toString().endsWith("/")?"":"/")+linkpath;
 				}
 				else
-					absoluteUrl= currentUrl.toString()+(currentUrl.toString().endsWith("/")?"":"/")+linkpath;
+					absoluteUrl= currentUrl.toString() +
+					(currentUrl.toString().endsWith("/")?"":"/")+linkpath;
 			}
-			long lastIndex = DBWrapper.getLastIndex();
-			long currentIndex = lastIndex+1;
-			Tuple tupleForQueue = new Tuple(new Date(), absoluteUrl);
 			addToHeadQueue(new URL(absoluteUrl));
 			allLinks.add(absoluteUrl);
-			/*
-			 * old way to add to queue
-			 * UrlForQueue urlForQueue = new UrlForQueue(currentIndex, absoluteUrl);
-			
-			DBWrapper.storeUrlForQueue(urlForQueue);
-			 */
 		} 
 		urlToUrlList.put(currentUrl.toString(), allLinks);
 		String line = S3FileWriter.prepareFileLineUrlList(currentUrl.toString(), allLinks);
@@ -828,7 +654,7 @@ public class XPathCrawler {
 		
 	}
 	/**
-	 * sets the initial url string
+	 * Sets the initial url string
 	 * @param url
 	 * @throws MalformedURLException
 	 */
@@ -836,8 +662,9 @@ public class XPathCrawler {
 	{
 		startUrlString = url;
 	}
+	
 	/**
-	 * clears head and get queues completely
+	 * Clears head and get queues completely
 	 */
 	private static void clearQueues()
 	{
@@ -846,7 +673,6 @@ public class XPathCrawler {
 			DBWrapper.clearHeadQueue();
 			DBWrapper.clearGetQueue();
 		} catch (UnsupportedEncodingException | InterruptedException e) {
-			// TODO Auto-generated catch block
 			e.printStackTrace();
 		}
 	}
@@ -857,17 +683,10 @@ public class XPathCrawler {
 			DBWrapper.removeServerFutureCrawlTime();
 		}
 	}
-	/**
-	 * clears any UrlForQueue objects left in the queue from the last crawl
-	 */
-	@Deprecated
-	private static void clearQueue()
-	{
-		while(!DBWrapper.isQueueEmpty())
-			DBWrapper.removeUrlForQueue();
-	}
+	
 
-	public static void processHead(String url) throws MalformedURLException, UnsupportedEncodingException
+	public static void processHead(String url) throws MalformedURLException,
+		UnsupportedEncodingException
 	{
 		if(url == null)
 			return;
@@ -882,7 +701,6 @@ public class XPathCrawler {
 		//robots.txt just downloaded so add back to head queue to send head request next time
 		if(downloaded && canCrawl)
 		{
-			System.out.println("robots.txt downloaded and can crawl site, adding url: "+currentUrl+" to Head queue");
 			addToHeadQueue(currentUrl);
 		}
 		//robots.txt previously downloaded, so go ahead and crawl
@@ -892,7 +710,6 @@ public class XPathCrawler {
 			try {
 				headRequestHandler(currentUrl, crawlDelay);
 			} catch (SAXException | ParserConfigurationException | IOException e) {
-				// TODO Auto-generated catch block
 				e.printStackTrace();
 			}
 			
@@ -902,6 +719,7 @@ public class XPathCrawler {
 			System.out.println("can't crawl this url: "+ currentUrl);
 		}
 	}
+	
 	private static int getCrawlDelay(RobotsTxtInfo robotsInfo)
 	{
 		int crawlDelay = 1;
@@ -918,6 +736,7 @@ public class XPathCrawler {
 		System.out.println("XpathCrawler getCrawlDelay. crawl delay is: "+crawlDelay);
 		return crawlDelay;
 	}
+	
 	public static void processGet(String url) throws IOException
 	{
 		GenericTuple<String, String> tuple = client.getDocument(url);
@@ -928,22 +747,8 @@ public class XPathCrawler {
 			S3FileWriter.writeToDocFile(line);
 		}
 		parseDocument(retrievedDocument, contentType, new URL(url), null, null);
-		/*
-		 * //check if is past crawlDelay
-				if(hasWaitedCrawlDelay(currentUrl, crawlDelay))
-				{
-					System.out.println("server of url: "+currentUrl.toString()+" has waited crawl delay, crawlDelay was: "+crawlDelay);
-					crawlDocument(currentUrl, crawlDelay);
-					
-				}
-				else
-				{
-					//System.out.println("server of url: "+currentUrl.toString()+" has NOT waited crawl delay, crawlDelay is "+crawlDelay);
-					UrlForQueue urlForQueue = new UrlForQueue(DBWrapper.getLastIndex()+1, currentUrl.toString());
-					DBWrapper.storeUrlForQueue(urlForQueue);
-				}
-		 */
 	}
+	
 	/**
 	 * The HeadThread class takes URLs from the headQueue, check for the
 	 * robots.txt file if it hasn't been fetched already, and then sends 
@@ -956,7 +761,6 @@ public class XPathCrawler {
 				try {
 					url = DBWrapper.getNextOnHeadQueue().right;
 				} catch (UnsupportedEncodingException | InterruptedException e1) {
-					// TODO Auto-generated catch block
 					e1.printStackTrace();
 				}
         		//This line is necessary for the shutdown call, see PriorityBlockingQueue
@@ -966,7 +770,6 @@ public class XPathCrawler {
         		try {
 					processHead(url);
 				} catch (MalformedURLException | UnsupportedEncodingException e) {
-					// TODO Auto-generated catch block
 					e.printStackTrace();
 				}
     		}
@@ -986,7 +789,6 @@ public class XPathCrawler {
 				try {
 					url = DBWrapper.getNextOnGetQueue().right;
 				} catch (UnsupportedEncodingException | InterruptedException e1) {
-					// TODO Auto-generated catch block
 					e1.printStackTrace();
 				}
 				//This line is necessary for the shutdown call, see HandlerQueue
@@ -1003,23 +805,6 @@ public class XPathCrawler {
 		}
 	}
 	
-	private void testQueue() throws UnsupportedEncodingException, InterruptedException
-	{
-		String urlValue = "http://whatitworks.com";
-		String urlFutureValue = "does it?";
-		Date futureDate = new Date(new Date().getTime()+5000);
-		Tuple urlAndDateFuture = new Tuple(futureDate, urlFutureValue);
-		DBWrapper.putOnHeadQueue(urlAndDateFuture, urlValue);
-		Tuple urlAndDate = new Tuple(new Date(), urlValue );
-		DBWrapper.putOnHeadQueue(urlAndDate, urlValue);
-		Tuple urlandDateMid = new Tuple(new Date(futureDate.getTime()-3000), "i think it does");
-		DBWrapper.putOnHeadQueue(urlandDateMid, "i think it does");
-		System.out.println(DBWrapper.getNextOnHeadQueue().toString());
-		Tuple tups = DBWrapper.getNextOnHeadQueue();
-		System.out.println(tups.toString());
-		System.out.println(DBWrapper.getNextOnHeadQueue().toString());
-	}
-	
 	static class S3WritingTask extends TimerTask {		
 		public void run() {
 			//every 10 minutes write to S3
@@ -1027,26 +812,49 @@ public class XPathCrawler {
 		}
 	}
 	
+	static class ListenerRunnable implements Runnable {
+
+		public void run() {
+			try (
+				ServerSocket serverSocket = new ServerSocket(portNumber, 1000);	
+			) {
+				while (true) {
+					Socket clientSocket = serverSocket.accept();
+					//take clientSocket and put it on the queue for worker threads
+					if (shutdown) {
+						System.out.println("Not accepting anymore requests");
+					}
+					requestQueue.enqueue(clientSocket);
+				}		
+			} catch (IOException e) {
+				e.printStackTrace();
+			}
+		}
+	}
+	
+	private void requestToClearQueue() {
+		System.out.println("clearing queue of links from previous crawl");
+		clearQueues();
+		clearServerFutureCrawlTimeIndex();
+	}
+	
 	/**
-	 * takes in 3-4 command line arguments to initialize the crawler and its constraints.
-	 * @param args
-	 * @throws UnknownHostException
-	 * @throws IOException
-	 * @throws ParseException
+	 * Takes in 4-5 command line arguments to initialize the crawler.
 	 */
-	public static void main(String[] args) throws UnknownHostException, IOException, ParseException
+	public static void main(String[] args) throws UnknownHostException,
+		IOException, ParseException
 	{
 		client = new HttpClient();
 		
 		if(args.length<4 || args.length>5)
 		{
-			System.out.println("incorrect number of command line arguments, expected 4 or 5, there were "+args.length);
+			System.out.println("incorrect number of command line arguments,"
+					+ " expected 4 or 5, there were "+args.length);
 			System.exit(-1);
 		}
 		try {
 			setUrlString(args[0]);
 		} catch (MalformedURLException e) {
-			// TODO Auto-generated catch block
 			e.printStackTrace();
 		}
 		storePath = args[1];
@@ -1063,31 +871,14 @@ public class XPathCrawler {
 		S3FileWriter.setUrlFileWriter(directory);
 		
 		DBWrapper wrapper = new DBWrapper(storePath);
-		System.out.println("clearing queue of links from previous crawl");
-		//clearQueue();
-		clearQueues();
-		clearServerFutureCrawlTimeIndex();
 		addToHeadQueue(new URL(startUrlString));
 		
-		/*old way of putting on queue
-		UrlForQueue urlForQueue = new UrlForQueue(Long.valueOf(0), startUrlString);
-		DBWrapper.storeUrlForQueue(urlForQueue);
-		*/
 		urlToUrlList = new HashMap<String, ArrayList<String>>();
-		/*For testing db connection between servlet and crawler
-		 * User newUser = new User("test", "pass");
-		DBWrapper.storeUser(newUser);
-		System.out.println("password: "+DBWrapper.getUser("test").getPassword());
-		Channel channel = new Channel();
-		channel.setName("first channel");
-		DBWrapper.storeChannel(channel);
-		System.out.println("channel name stored is: "+DBWrapper.getChannel("first channel").getName());
-		 */
 		
 		//Create thread pools to run the crawler
-		Thread[] headPool = new Thread[10];
-		Thread[] getPool = new Thread[10];
-		for (int i = 0; i < 1; i++) {
+		Thread[] headPool = new Thread[50];
+		Thread[] getPool = new Thread[50];
+		for (int i = 0; i < 50; i++) {
 			headPool[i] = new Thread(new HeadThreadRunnable());
 			headPool[i].start();
 			getPool[i] = new Thread(new GetThreadRunnable());
@@ -1096,8 +887,8 @@ public class XPathCrawler {
 
 		TimerTask s3WritingTask = new S3WritingTask();
 		Timer s3Handler = new Timer(true);
-		//wait 30 seconds to start, try every 30 seconds
-		s3Handler.scheduleAtFixedRate(s3WritingTask, 30000, 30000);
+		//wait 5 seconds to start, try every 5 seconds
+		s3Handler.scheduleAtFixedRate(s3WritingTask, 300000, 300000);
 		
 		//add a shutdown hook to properly close DB
 		Runtime.getRuntime().addShutdownHook(new Thread() {
@@ -1107,17 +898,5 @@ public class XPathCrawler {
 				System.out.println("Proper Shutdown.");
 			}
 		});
-
-		//WILL NOT need code below after threads are implemented
-		/*try {
-			//startCrawling();
-			//System.out.println("num crawled: "+numCrawled);
-			//System.out.println("clearing queue for next crawl");
-			//TODO write a way to clear the get and head queue when wanted
-			//clearQueue();
-		} catch (SAXException | ParserConfigurationException e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
-		}*/	
 	}
 }

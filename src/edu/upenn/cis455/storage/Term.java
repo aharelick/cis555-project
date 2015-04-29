@@ -18,9 +18,16 @@ public class Term {
 	@PrimaryKey
 	private String term;
 	private HashMap<String, Double> tf;
+	//maps a URL to the term frequency
 	private HashMap<String, LinkedList<Integer>> locations;
+	//maps a URL to a list of locations for a particular term
 	
+	//because Berkeley DB sucks
 	public Term() {
+	}
+	
+	public Term(String t) {
+		term = t;
 		tf = new HashMap<String, Double>();
 		locations = new HashMap<String, LinkedList<Integer>>();
 	}
@@ -31,6 +38,14 @@ public class Term {
 	
 	public void addLocationList(String url, LinkedList<Integer> loc) {
 		locations.put(url, loc);
+	}
+	
+	public LinkedList<Integer> getLocations(String url) {
+		return locations.get(url);
+	}
+	
+	public double getTermFrequency(String url) {
+		return tf.get(url);
 	}
 
 }

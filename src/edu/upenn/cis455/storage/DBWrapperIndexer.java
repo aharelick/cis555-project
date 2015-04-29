@@ -19,6 +19,7 @@ public class DBWrapperIndexer {
 	 * Create the DB if it doesn't exist and open it if it does exist.
 	 * @param dbdir - the path to the database location
 	 */
+	
 	public static void init(String dbdir) {
 
 		File dir = new File(dbdir);
@@ -54,6 +55,10 @@ public class DBWrapperIndexer {
 	
 	public static void deleteTerm(String term) {
 		termIndex.delete(term);
+	}
+
+	public static void sync() {
+		//store.sync();
 	}
 	
 }

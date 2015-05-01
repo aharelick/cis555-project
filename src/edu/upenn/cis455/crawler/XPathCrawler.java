@@ -8,6 +8,8 @@ import java.io.UnsupportedEncodingException;
 import java.net.MalformedURLException;
 import java.net.ServerSocket;
 import java.net.Socket;
+import java.net.URI;
+import java.net.URISyntaxException;
 import java.net.URL;
 import java.net.URLDecoder;
 import java.net.UnknownHostException;
@@ -100,11 +102,20 @@ public class XPathCrawler {
 		try {
 			headers = client.sendHead(robotsUrl);
 		} catch (ParseException e) {
+			RobotsTxtInfo robotsInfo = new RobotsTxtInfo();
+			robotsInfo.setServerUrl(baseUrl);
+			DBWrapper.storeRobotsInfo(robotsInfo);
 			return false;
 		} catch (UnknownHostException e) {
+			RobotsTxtInfo robotsInfo = new RobotsTxtInfo();
+			robotsInfo.setServerUrl(baseUrl);
+			DBWrapper.storeRobotsInfo(robotsInfo);
 			e.printStackTrace();
 			return false;
 		} catch (IOException e) {
+			RobotsTxtInfo robotsInfo = new RobotsTxtInfo();
+			robotsInfo.setServerUrl(baseUrl);
+			DBWrapper.storeRobotsInfo(robotsInfo);
 			e.printStackTrace();
 			return false;
 		}
@@ -116,8 +127,14 @@ public class XPathCrawler {
 			try {
 				robotsInfo = parseRobotsTxt(robotsUrlString);
 			} catch (ParseException e) {
+				RobotsTxtInfo robotsInfoDummy = new RobotsTxtInfo();
+				robotsInfoDummy.setServerUrl(baseUrl);
+				DBWrapper.storeRobotsInfo(robotsInfoDummy);
 				return true;
 			} catch (IOException e) {
+				RobotsTxtInfo robotsInfoDummy = new RobotsTxtInfo();
+				robotsInfoDummy.setServerUrl(baseUrl);
+				DBWrapper.storeRobotsInfo(robotsInfoDummy);
 				e.printStackTrace();
 				return true;
 			}
@@ -465,11 +482,11 @@ public class XPathCrawler {
 					return;
 				}
 			}
-			else
+			/*else
 			{
 				System.out.println("error: no content length header. skipping.");
 				return;
-			}
+			}*/
 		}
 		XmlDoc xmlDoc=null;
 		HtmlDoc htmlDoc=null;
@@ -498,6 +515,8 @@ public class XPathCrawler {
 		}
 		else if(responseCode.contains("301")||responseCode.contains("302"))
 		{
+			//store to mark as being crawled in this crawl
+			DBWrapper.storeUrlHasBeenCrawled(url.toString());
 			if(headers.containsKey("Location"))
 			{
 				URL currentUrl = new URL(headers.get("Location").get(0));
@@ -586,6 +605,7 @@ public class XPathCrawler {
 	private static void parseDocument(String retrievedDocument,
 			String contentType, URL url, HtmlDoc htmlDoc, XmlDoc xmlDoc)
 	{
+		System.out.println(retrievedDocument);
 		Date currentDate = new Date();
 		DocumentLastCrawlTime lastCrawlTime= new DocumentLastCrawlTime(
 				url.toString(), currentDate);
@@ -634,8 +654,19 @@ public class XPathCrawler {
 			System.out.println("link: "+link.attr("href") + " link text: "+link.text());
 			String linkpath = link.attr("href").trim();
 			String absoluteUrl;
-			if(linkpath.startsWith("http"))
+			URI uriCurrentUrl;
+			try {
+				uriCurrentUrl = new URI(linkpath);
+			} catch (URISyntaxException e) {
+				// TODO Auto-generated catch block
+				e.printStackTrace();
+				return;
+			}
+			if(uriCurrentUrl.isAbsolute())
+			{
 				absoluteUrl = linkpath;
+				System.out.println("is absolute url: "+linkpath);
+			}
 			else
 			{
 				String [] tokens = currentUrl.toString().trim().split("/");
@@ -644,10 +675,16 @@ public class XPathCrawler {
 					absoluteUrl = currentUrl.toString().substring(0,
 							currentUrl.toString().lastIndexOf("/")) +
 							(currentUrl.toString().endsWith("/")?"":"/")+linkpath;
+					System.out.println("removing file name to add relative path, full url is: "+absoluteUrl+"currentUrl is: "+currentUrl.toString());
 				}
 				else
+				{
+					
 					absoluteUrl= currentUrl.toString() +
 					(currentUrl.toString().endsWith("/")?"":"/")+linkpath;
+					System.out.println("absolute url added to head queue is: "+absoluteUrl);
+				}
+				
 			}
 			addToHeadQueue(new URL(absoluteUrl));
 			allLinks.add(absoluteUrl);
@@ -835,7 +872,7 @@ public class XPathCrawler {
 		}
 	}
 	
-	private void requestToClearQueue() {
+	private static void requestToClearQueue() {
 		System.out.println("clearing queue of links from previous crawl");
 		clearQueues();
 		clearServerFutureCrawlTimeIndex();
@@ -874,11 +911,14 @@ public class XPathCrawler {
 		S3FileWriter.setUrlFileWriter(directory);
 		
 		DBWrapper wrapper = new DBWrapper(storePath);
-		addToHeadQueue(new URL("http://www.yahoo.com"));
+		/*addToHeadQueue(new URL("http://www.yahoo.com"));
 		addToHeadQueue(new URL("http://www.wikipedia.org/Philosophy"));
 		addToHeadQueue(new URL("http://www.reddit.com"));
 		addToHeadQueue(new URL("http://www.yahoo.com"));
 		addToHeadQueue(new URL("http://www.nytimes.com"));	
+		*/
+		requestToClearQueue();
+		addToHeadQueue(new URL("http://www.reddit.com/"));
 		
 		urlToUrlList = new HashMap<String, ArrayList<String>>();
 		

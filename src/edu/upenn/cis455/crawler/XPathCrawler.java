@@ -124,12 +124,15 @@ public class XPathCrawler {
 			robotsInfo.setServerUrl(baseUrl);
 			DBWrapper.storeRobotsInfo(robotsInfo);
 		}
-		else if(responseCode.contains("301")||responseCode.contains("302"))
+		else if(responseCode.contains("301")||responseCode.contains("302")) {
 			System.out.println("should redirect probably");
-		else {
 			RobotsTxtInfo robotsInfo = new RobotsTxtInfo();
+			robotsInfo.setServerUrl(baseUrl);
 			DBWrapper.storeRobotsInfo(robotsInfo);
-			
+		} else {
+			RobotsTxtInfo robotsInfo = new RobotsTxtInfo();
+			robotsInfo.setServerUrl(baseUrl);
+			DBWrapper.storeRobotsInfo(robotsInfo);	
 		}
 		return true;	
 	}
@@ -256,6 +259,7 @@ public class XPathCrawler {
 		String matchedDisallowedPath = "";
 		ArrayList<String> allowedPaths;
 		ArrayList<String> disallowedPaths;
+		
 		if(robotsInfo.containsUserAgent("cis455crawler"))
 		{
 			allowedPaths = robotsInfo.getAllowedLinks("cis455crawler");
@@ -870,7 +874,7 @@ public class XPathCrawler {
 		S3FileWriter.setUrlFileWriter(directory);
 		
 		DBWrapper wrapper = new DBWrapper(storePath);
-		addToHeadQueue(new URL("http://www.dmoz.org"));
+		addToHeadQueue(new URL("http://www.yahoo.com"));
 		addToHeadQueue(new URL("http://www.wikipedia.org/Philosophy"));
 		addToHeadQueue(new URL("http://www.reddit.com"));
 		addToHeadQueue(new URL("http://www.yahoo.com"));
@@ -881,7 +885,7 @@ public class XPathCrawler {
 		//Create thread pools to run the crawler
 		Thread[] headPool = new Thread[50];
 		Thread[] getPool = new Thread[50];
-		for (int i = 0; i < 50; i++) {
+		for (int i = 0; i < 1; i++) {
 			headPool[i] = new Thread(new HeadThreadRunnable());
 			headPool[i].start();
 			getPool[i] = new Thread(new GetThreadRunnable());

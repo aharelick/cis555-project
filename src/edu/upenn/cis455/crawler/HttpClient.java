@@ -91,7 +91,7 @@ public class HttpClient {
 		String path = currentUrl.getPath();
 		if(!path.startsWith("/"))
 			path = "/" + path;
-		String request = "GET "+path+" HTTP/1.1\r\n"+"Host: "+currentUrl.getHost()+"\r\nUser-Agent: cis455crawler\r\n\r\n";
+		String request = "GET "+path+" HTTP/1.1\r\n"+"Host: "+currentUrl.getHost()+"\r\nUser-Agent: cis455crawler\r\nConnection: Close\r\n\r\n";
 		System.out.println(request);
 		out.print(request);
 		out.flush();
@@ -172,6 +172,7 @@ public class HttpClient {
 		String htmlHeaders="";
 		String line = "";
 		//line = in.readLine();
+		System.out.println(currentUrl);
 		if(isHttp(currentUrl))
 		{
 			while (!(line= in.readLine()).equals("")) {
@@ -227,7 +228,7 @@ public class HttpClient {
 		if(isHttp(currentUrl))
 		{
 			Socket socket = new Socket(currentUrl.getHost(), 80);
-			socket.setSoTimeout(8000);
+			socket.setSoTimeout(20000);
 			PrintWriter out = new PrintWriter(socket.getOutputStream(), true);
 			//System.out.println("relative path = "+currentUrl.getPath());
 			SimpleDateFormat format = new SimpleDateFormat("EEE, dd MMM yyyy HH:mm:ss zzz");
@@ -235,7 +236,7 @@ public class HttpClient {
 			String path = currentUrl.getPath();
 			if(!path.startsWith("/"))
 				path = "/" + path;
-			String request = "HEAD "+path+" HTTP/1.1\r\n"+"Host: "+currentUrl.getHost()+"\r\nUser-Agent: cis455crawler\r\n";
+			String request = "HEAD "+path+" HTTP/1.1\r\n"+"Host: "+currentUrl.getHost()+"\r\nUser-Agent: cis455crawler\r\nConnection: Close\r\n\r\n";
 			if(documentLastCrawlTime!=null)
 			{
 				String dateString = format.format(documentLastCrawlTime.getLastCrawlTime());
@@ -259,6 +260,7 @@ public class HttpClient {
 			
 			HttpsURLConnection connection = (HttpsURLConnection)currentUrl.openConnection();
 			connection.setRequestProperty("User-Agent:", "cis455crawler");
+			connection.setRequestProperty("Connection", "Close");
 			if(documentLastCrawlTime!=null)
 			{
 				String dateString = format.format(documentLastCrawlTime.getLastCrawlTime());

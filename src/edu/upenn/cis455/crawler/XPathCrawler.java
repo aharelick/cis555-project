@@ -605,7 +605,6 @@ public class XPathCrawler {
 	private static void parseDocument(String retrievedDocument,
 			String contentType, URL url, HtmlDoc htmlDoc, XmlDoc xmlDoc)
 	{
-		System.out.println(retrievedDocument);
 		Date currentDate = new Date();
 		DocumentLastCrawlTime lastCrawlTime= new DocumentLastCrawlTime(
 				url.toString(), currentDate);
@@ -666,6 +665,9 @@ public class XPathCrawler {
 			{
 				absoluteUrl = linkpath;
 				System.out.println("is absolute url: "+linkpath);
+			} else if (uriCurrentUrl.toString().startsWith("//"))
+			{
+				absoluteUrl = "http:" + linkpath;
 			}
 			else
 			{
@@ -911,17 +913,16 @@ public class XPathCrawler {
 		S3FileWriter.setUrlFileWriter(directory);
 		
 		DBWrapper wrapper = new DBWrapper(storePath);
-		/*addToHeadQueue(new URL("http://www.yahoo.com"));
-		addToHeadQueue(new URL("http://www.wikipedia.org/Philosophy"));
-		addToHeadQueue(new URL("http://www.reddit.com"));
-		addToHeadQueue(new URL("http://www.yahoo.com"));
-		addToHeadQueue(new URL("http://www.nytimes.com"));	
-		*/
+		// clear all the queues
 		requestToClearQueue();
-		addToHeadQueue(new URL("http://www.reddit.com/"));
+		//addToHeadQueue(new URL("http://www.yahoo.com"));
+		addToHeadQueue(new URL("http://www.wikipedia.org/Philosophy"));
+		//addToHeadQueue(new URL("http://www.reddit.com"));
+		//addToHeadQueue(new URL("http://www.yahoo.com"));
+		//addToHeadQueue(new URL("http://www.nytimes.com"));	
+		//addToHeadQueue(new URL("http://www.reddit.com/"));
 		
 		urlToUrlList = new HashMap<String, ArrayList<String>>();
-		
 		//Create thread pools to run the crawler
 		Thread[] headPool = new Thread[50];
 		Thread[] getPool = new Thread[50];

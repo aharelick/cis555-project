@@ -914,13 +914,13 @@ public class XPathCrawler {
 		
 		DBWrapper wrapper = new DBWrapper(storePath);
 		// clear all the queues
-		requestToClearQueue();
+		//requestToClearQueue();
 		//addToHeadQueue(new URL("http://www.yahoo.com"));
 		addToHeadQueue(new URL("http://www.wikipedia.org/Philosophy"));
 		//addToHeadQueue(new URL("http://www.reddit.com"));
 		//addToHeadQueue(new URL("http://www.yahoo.com"));
 		//addToHeadQueue(new URL("http://www.nytimes.com"));	
-		//addToHeadQueue(new URL("http://www.reddit.com/"));
+		addToHeadQueue(new URL("http://www.reddit.com/"));
 		
 		urlToUrlList = new HashMap<String, ArrayList<String>>();
 		//Create thread pools to run the crawler

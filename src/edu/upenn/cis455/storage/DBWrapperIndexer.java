@@ -14,6 +14,7 @@ public class DBWrapperIndexer {
 	private static EntityStore store;
 	
 	private static PrimaryIndex<String, Term> termIndex;
+	private static PrimaryIndex<String, S3File> s3FileIndex;
 	
 	/**
 	 * Create the DB if it doesn't exist and open it if it does exist.
@@ -40,6 +41,7 @@ public class DBWrapperIndexer {
         System.out.println(dir.getAbsolutePath());
         store = new EntityStore(myEnv, "EntityStore", storeConfig);
         termIndex = store.getPrimaryIndex(String.class, Term.class);
+        s3FileIndex = store.getPrimaryIndex(String.class, S3File.class);
         DatabaseShutdownHookIndexer hook = new DatabaseShutdownHookIndexer(myEnv, store);
         Runtime.getRuntime().addShutdownHook(hook);
         System.out.println("Database Started");
@@ -61,6 +63,17 @@ public class DBWrapperIndexer {
 		//store.sync();
 	}
 	
+	public static S3File getS3File(String filename) {
+		return s3FileIndex.get(filename);
+	}
+	
+	public static void putS3File(S3File s3File) {
+		s3FileIndex.put(s3File);
+	}
+	
+	public static void deleteS3File(String filename) {
+		s3FileIndex.delete(filename);
+	}
 }
 	
 	

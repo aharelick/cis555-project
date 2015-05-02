@@ -5,7 +5,6 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.util.ArrayList;
-import java.util.UUID;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
 
@@ -23,12 +22,27 @@ import com.amazonaws.services.s3.model.S3Object;
 import com.amazonaws.services.s3.model.S3ObjectSummary;
 
 import edu.upenn.cis455.storage.DBWrapperIndexer;
+import edu.upenn.cis455.storage.S3File;
 import edu.upenn.cis455.storage.Term;
 
+/**
+ * This class handles the main functionality for the search
+ * engine's indexer. It pulls files from S3, parses them for
+ * documents and their content. It then takes each individual
+ * document, adds its content to the inverted indexer, calculates
+ * tf scores, and calculates the positioning of each word in the
+ * document to be accessed from the front-end when returning results.
+ * @author Corey Loman
+ */
 public class Indexer {
 	
+	/** Blocking Queue contains pages to be indexed.*/
 	private BlockingQueue<Page> bq;
 	
+	/**
+	 * Constructor that inits the blocking queue, opens the DB,
+	 * and calls start().
+	 */
 	public Indexer() {
 		// spins up all the DocIndexer threads
 		bq = new LinkedBlockingQueue<Page>();
@@ -37,12 +51,20 @@ public class Indexer {
 		start();
 	}
 	
+	/**
+	 *  used solely for testing the indexer
+	 * @param args: command-line arguments
+	 */
 	public static void main(String[] args) {
 		new Indexer();
 		Term curr = DBWrapperIndexer.getTerm("ISIS");
 		System.out.println(curr.getTermFrequency("http://www.nytimes.com"));
 	}
 	
+	/**
+	 * Calls extractObject(), starts the DocIndexer threads,
+	 * and handles moving PageRank results from S3 to EBS.
+	 */
 	public void start() {
 		// pulls from S3
 		// adds new url -> docContent to the blocking queue
@@ -58,6 +80,13 @@ public class Indexer {
 		// put all PR results to database, mapping url to PageRank score
 	}
 	
+	private static AmazonS3 s3;
+	private static String bucketName;
+	
+	/**
+	 * Pulls files from S3 that contain documents that need to
+	 * be indexed.
+	 */
 	private void extractObject() {
 		 AWSCredentials credentials = null;
 	        try {
@@ -70,11 +99,11 @@ public class Indexer {
 	                    e);
 	        }
 
-	        AmazonS3 s3 = new AmazonS3Client(credentials);
+	        s3 = new AmazonS3Client(credentials);
 	        Region usWest2 = Region.getRegion(Regions.US_EAST_1);
 	        s3.setRegion(usWest2);
 
-	        String bucketName = "for.indexer";
+	        bucketName = "for.indexer";
 	        System.out.println("Listing objects");
             ObjectListing objectListing = s3.listObjects(new ListObjectsRequest()
                     .withBucketName(bucketName)
@@ -82,28 +111,56 @@ public class Indexer {
             for (S3ObjectSummary objectSummary : objectListing.getObjectSummaries()) {
                 String key = objectSummary.getKey();
                 System.out.println("Getting object: " + key);
-                S3Object object = s3.getObject(new GetObjectRequest(bucketName, key));
-                ArrayList<String> pages = null;
-                System.out.println("About to concatenate");
-                try {
-					pages = concatenateTextInputStream(object.getObjectContent());
-				} catch (IOException e) {
-					e.printStackTrace();
-				}
-                System.out.println("Finished concatenating");
-                for (String p : pages) {
-                	String[] splitted = p.split("\t", 2);
-                	Page page = new Page(splitted[0], splitted[1]);
-                	bq.add(page);
-                	System.out.println("URL IS " + page.getUrl());
-                	//System.out.println("CONTENT IS: " + page.getContent());
-                	break;
+                S3File tmp;
+                if ((tmp = DBWrapperIndexer.getS3File(key)) != null) {
+                	if (!tmp.wasIndexed()) {
+                		indexFile(key);
+                		tmp.finishedIndexing(true);
+                		DBWrapperIndexer.putS3File(tmp);
+                	}
+                } else {
+                	tmp = new S3File(key);
+                	indexFile(key);
+                	tmp.finishedIndexing(true);
+                	DBWrapperIndexer.putS3File(tmp);
                 }
-                System.out.println("Pages Downloaded: " + pages.size());
-                break;
+                //break;
             }
 	}
 	
+	/**
+	 * Indexes an individual file from S3.
+	 * This file contains many documents.
+	 * @param key: the key needed to pull the correct file from S3
+	 */
+	private void indexFile(String key) {
+        S3Object object = s3.getObject(new GetObjectRequest(bucketName, key));
+        ArrayList<String> pages = null;
+        System.out.println("About to concatenate");
+        try {
+			pages = concatenateTextInputStream(object.getObjectContent());
+		} catch (IOException e) {
+			e.printStackTrace();
+		}
+        System.out.println("Finished concatenating");
+        for (String p : pages) {
+        	String[] splitted = p.split("\t", 2);
+        	Page page = new Page(splitted[0], splitted[1]);
+        	bq.add(page);
+        	System.out.println("URL IS " + page.getUrl());
+        	//System.out.println("CONTENT IS: " + page.getContent());
+        	//break;
+        }
+        
+        System.out.println("Pages Downloaded: " + pages.size());
+	}
+	
+	/**
+	 * Splits a file into individual pages.
+	 * @param input: an InputStream to read from the S3 file
+	 * @return an array list where each element is a document's content
+	 * @throws IOException
+	 */
 	private static ArrayList<String> concatenateTextInputStream(InputStream input) throws IOException {
         String output = "";
         ArrayList<String> splitted = new ArrayList<String>();
@@ -128,6 +185,12 @@ public class Indexer {
         return splitted;
     }
 
+	/**
+	 * An inner class that extends Thread. Each of these threads
+	 * pulls off the blocking queue and starts indexing that
+	 * document by calling parseDocument() on it.
+	 * @author Corey Loman
+	 */
 	class DocIndexer extends Thread {
 		
 		public DocIndexer() {

@@ -47,5 +47,9 @@ public class Term {
 	public double getTermFrequency(String url) {
 		return tf.get(url);
 	}
+	public HashMap<String, Double> getUrlToTFHashMap()
+	{
+		return tf;
+	}
 
 }

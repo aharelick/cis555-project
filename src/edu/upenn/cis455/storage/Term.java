@@ -22,7 +22,6 @@ public class Term {
 	private HashMap<String, LinkedList<Integer>> locations;
 	//maps a URL to a list of locations for a particular term
 	
-	//because Berkeley DB sucks
 	public Term() {
 	}
 	

@@ -24,7 +24,7 @@ import com.amazonaws.services.s3.model.S3ObjectSummary;
 
 import edu.upenn.cis455.storage.DBWrapperIndexer;
 import edu.upenn.cis455.storage.S3File;
-import edu.upenn.cis455.storage.Term;
+//import edu.upenn.cis455.storage.Term;
 
 /**
  * This class handles the main functionality for the search
@@ -38,7 +38,9 @@ import edu.upenn.cis455.storage.Term;
 public class Indexer {
 	
 	/** Blocking Queue contains pages to be indexed.*/
-	private BlockingQueue<Page> bq;
+	private BlockingQueue<Page> pagesBQ;
+	/** Blocking Queue contains files to be downloaded.*/
+	private BlockingQueue<InputStream> s3FilesBQ;
 	
 	/**
 	 * Constructor that inits the blocking queue, opens the DB,
@@ -46,7 +48,8 @@ public class Indexer {
 	 */
 	public Indexer() {
 		// spins up all the DocIndexer threads
-		bq = new LinkedBlockingQueue<Page>();
+		pagesBQ = new LinkedBlockingQueue<Page>();
+		s3FilesBQ = new LinkedBlockingQueue<InputStream>();
 		// TODO fix with actual location as argument
 		DBWrapperIndexer.init("/home/cis455/workspace/cis555-project/database");
 		start();
@@ -58,7 +61,7 @@ public class Indexer {
 	 */
 	public static void main(String[] args) {
 		new Indexer();
-		Term curr = DBWrapperIndexer.getTerm("ISIS");
+		//Term curr = DBWrapperIndexer.getTerm("ISIS");
 		//System.out.println(curr.getTermFrequency("http://www.nytimes.com"));
 	}
 	
@@ -71,7 +74,7 @@ public class Indexer {
 		// adds new url -> docContent to the blocking queue
 		FileDownloader fd = new FileDownloader();
 		fd.start();
-		System.out.println("HERER HERER HERER HERER");
+		System.out.println("HERE HERE HERE HERE");
 		try {
 			Thread.sleep(3000);
 		} catch (InterruptedException e) {
@@ -83,8 +86,15 @@ public class Indexer {
 		HashSet<DocIndexer> indexerThreads = new HashSet<DocIndexer>();
 		for (int i = 0; i < 10; i++) {
 			DocIndexer tmp = new DocIndexer();
-			indexerThreads.add(tmp);
 			tmp.start();
+			indexerThreads.add(tmp);
+		}
+		
+		HashSet<Concatenator> concatenatorThreads = new HashSet<Concatenator>();
+		for (int i = 0; i < 4; i++) {
+			Concatenator tmp = new Concatenator();
+			tmp.start();
+			concatenatorThreads.add(tmp);
 		}
 		
 		// after all urls and content have been read from S3,
@@ -109,8 +119,10 @@ public class Indexer {
 		public void run() {
 			// TODO change this while loop statement probably
 			while (true) {
-				Page curr = bq.poll();
-				if (curr == null) continue;
+				Page curr = pagesBQ.poll();
+				if (curr == null) {
+					continue;
+				}
 				System.out.println("Bout to index");
 				Doc doc = new Doc(curr.getUrl(), curr.getContent());
 				doc.parseDocument();
@@ -143,7 +155,6 @@ public class Indexer {
 		 * be indexed.
 		 */
 		private void extractObject() {
-			System.out.println("what what in the ");
 			 AWSCredentials credentials = null;
 		        try {
 		            credentials = new ProfileCredentialsProvider("cis455_mark").getCredentials();
@@ -156,8 +167,8 @@ public class Indexer {
 		        }
 
 		        s3 = new AmazonS3Client(credentials);
-		        Region usWest2 = Region.getRegion(Regions.US_EAST_1);
-		        s3.setRegion(usWest2);
+		        Region usEast1 = Region.getRegion(Regions.US_EAST_1);
+		        s3.setRegion(usEast1);
 
 		        bucketName = "for.indexer";
 		        System.out.println("Listing objects");
@@ -191,55 +202,82 @@ public class Indexer {
 		 */
 		private void indexFile(String key) {
 	        S3Object object = s3.getObject(new GetObjectRequest(bucketName, key));
-	        ArrayList<String> pages = null;
 	        System.out.println("About to concatenate");
-	        try {
-				pages = concatenateTextInputStream(object.getObjectContent());
+	        s3FilesBQ.add(object.getObjectContent());
+		}
+	}
+		
+	class Concatenator extends Thread {
+
+		public Concatenator() {
+			
+		}
+
+		@Override
+		public void run() {
+			InputStream input = null;
+			boolean keepChecking = true;
+			while (keepChecking) {
+				input = s3FilesBQ.poll();
+				if (input != null) {
+					keepChecking = false;
+				}
+			}
+			ArrayList<String> pages = null;
+			try {
+				pages = concatenateTextInputStream(input);
+				System.out.println("returned");
 			} catch (IOException e) {
 				e.printStackTrace();
 			}
-	        System.out.println("Finished concatenating");
-	        for (String p : pages) {
-	        	String[] splitted = p.split("\t", 2);
-	        	Page page = new Page(splitted[0], splitted[1]);
-	        	bq.add(page);
-	        	System.out.println("URL IS " + page.getUrl());
-	        	//System.out.println("CONTENT IS: " + page.getContent());
-	        	//break;
-	        }
-	        
-	        System.out.println("Pages Downloaded: " + pages.size());
+			for (String p : pages) {
+				String[] splitted = p.split("\t", 2);
+				Page page = new Page(splitted[0], splitted[1]);
+				pagesBQ.add(page);
+				System.out.println("URL IS " + page.getUrl());
+				// System.out.println("CONTENT IS: " + page.getContent());
+				// break;
+			}
+			input = null;
+			System.out.println("Pages Downloaded: " + pages.size());
+
 		}
-		
-		/**
-		 * Splits a file into individual pages.
-		 * @param input: an InputStream to read from the S3 file
-		 * @return an array list where each element is a document's content
-		 * @throws IOException
-		 */
-		private ArrayList<String> concatenateTextInputStream(InputStream input) throws IOException {
-	        String output = "";
-	        ArrayList<String> splitted = new ArrayList<String>();
-			BufferedReader reader = new BufferedReader(new InputStreamReader(input));
-	        while (true) {
-	            String line = reader.readLine();
-	            if (line == null) break;
-	            if (line.contains("CIS555###Split%%%Document***Line")) {
-	            	if (line.trim().equals("CIS555###Split%%%Document***Line")) {
-	            		splitted.add(output);
-	            		output = "";
-					} else {
-						output += line.split("CIS555###Split%%%Document\\*\\*\\*Line")[0];
-						splitted.add(output);
-						output = line.split("CIS555###Split%%%Document\\*\\*\\*Line")[1];
-					}
-	            	//break; //comment this out for real use
-	            	continue; //comment this in for real use
-	            }
-	            output += line;
-	        }
-	        return splitted;
-	    }
-	}
+				
+			/**
+			 * Splits a file into individual pages.
+			 * @param input: an InputStream to read from the S3 file
+			 * @return an array list where each element is a document's content
+			 * @throws IOException
+			 */
+			private ArrayList<String> concatenateTextInputStream(InputStream input) throws IOException {
+		        String output = "";
+		        ArrayList<String> splitted = new ArrayList<String>();
+				BufferedReader reader = new BufferedReader(new InputStreamReader(input));
+		        while (true) {
+		            String line = reader.readLine();
+		            //System.out.println("LINE IS: " + line);
+		            if (line == null) {
+		            	System.out.println("LINE IS NULL");
+		            	break;
+		            }
+		            if (line.contains("CIS555###Split%%%Document***Line")) {
+		            	if (line.trim().equals("CIS555###Split%%%Document***Line")) {
+		            		splitted.add(output);
+		            		output = "";
+						} else {
+							output += line.split("CIS555###Split%%%Document\\*\\*\\*Line")[0];
+							splitted.add(output);
+							output = line.split("CIS555###Split%%%Document\\*\\*\\*Line")[1];
+						}
+		            	//break; //comment this out for real use
+		            	continue; //comment this in for real use
+		            }
+		            output += line;
+		        }
+		        System.out.println("Finished concatenating");
+		        return splitted;
+		    }
+		}
+	
 	
 }

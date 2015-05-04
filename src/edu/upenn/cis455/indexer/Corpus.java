@@ -34,7 +34,7 @@ public class Corpus {
 			}
 			dbTerm.addFrequency(url, freq);
 			dbTerm.addLocationList(url, termLoc);
-			DBWrapperIndexer.sync();
+			DBWrapperIndexer.putTerm(dbTerm);
 		}
 		
 	}

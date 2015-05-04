@@ -24,6 +24,7 @@ import com.amazonaws.services.s3.model.S3ObjectSummary;
 
 import edu.upenn.cis455.storage.DBWrapperIndexer;
 import edu.upenn.cis455.storage.S3File;
+import edu.upenn.cis455.storage.Term;
 
 //import edu.upenn.cis455.storage.Term;
 
@@ -53,6 +54,11 @@ public class Indexer {
 		s3FilesBQ = new LinkedBlockingQueue<S3Object>();
 		// TODO fix with actual location as argument
 		DBWrapperIndexer.init("/home/cis455/workspace/cis555-project/database");
+		/*Term curr = DBWrapperIndexer.getTerm("privacy");
+		System.out.println("curr is "+curr);
+		Term current = DBWrapperIndexer.getTerm("past");
+		System.out.println("curr is "+current);*/
+		//System.out.println(curr.getTermFrequency("http://www.nytimes.com"));
 		init();
 	}
 
@@ -175,7 +181,7 @@ public class Indexer {
 		private void extractObject() {
 			AWSCredentials credentials = null;
 			try {
-				credentials = new ProfileCredentialsProvider("cis455_mark")
+				credentials = new ProfileCredentialsProvider("default")
 						.getCredentials();
 			} catch (Exception e) {
 				throw new AmazonClientException(

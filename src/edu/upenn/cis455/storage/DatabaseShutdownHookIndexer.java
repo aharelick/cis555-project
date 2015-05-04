@@ -19,6 +19,7 @@ public class DatabaseShutdownHookIndexer extends Thread{
 	
 	public void run() {
 		if (environment != null) {
+			store.sync();
 			store.close();
 			environment.close();
 			System.out.println("Closed the Database");

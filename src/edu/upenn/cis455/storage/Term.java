@@ -22,6 +22,7 @@ public class Term {
 	private HashMap<String, LinkedList<Integer>> locations;
 	//maps a URL to a list of locations for a particular term
 	
+	//because Berkeley DB sucks
 	public Term() {
 	}
 	
@@ -45,6 +46,14 @@ public class Term {
 	
 	public double getTermFrequency(String url) {
 		return tf.get(url);
+	}
+	public HashMap<String, Double> getUrlToTFHashMap()
+	{
+		return tf;
+	}
+	public String getTerm()
+	{
+		return term;
 	}
 
 }

@@ -4,7 +4,6 @@ import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
-import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.concurrent.BlockingQueue;
@@ -42,7 +41,7 @@ public class Indexer {
 	/** Blocking Queue contains pages to be indexed. */
 	private BlockingQueue<Page> pagesBQ;
 	/** Blocking Queue contains files to be downloaded. */
-	private BlockingQueue<InputStream> s3FilesBQ;
+	private BlockingQueue<S3Object> s3FilesBQ;
 
 	/**
 	 * Constructor that inits the blocking queue, opens the DB, and calls
@@ -51,7 +50,7 @@ public class Indexer {
 	public Indexer() {
 		// spins up all the DocIndexer threads
 		pagesBQ = new LinkedBlockingQueue<Page>();
-		s3FilesBQ = new LinkedBlockingQueue<InputStream>();
+		s3FilesBQ = new LinkedBlockingQueue<S3Object>();
 		// TODO fix with actual location as argument
 		DBWrapperIndexer.init("/home/cis455/workspace/cis555-project/database");
 		init();
@@ -60,7 +59,8 @@ public class Indexer {
 	private static int maxFiles;
 	private static int numFiles;
 	private static boolean keepRunning;
-	protected static HashMap<InputStream, String> objectToFileName;
+	protected static HashMap<S3Object, String> objectToFileName;
+	private static String bucketName;
 
 	/**
 	 * used solely for testing the indexer
@@ -69,18 +69,22 @@ public class Indexer {
 	 *            : command-line arguments
 	 */
 	public static void main(String[] args) {
-		if (args.length == 0) {
+		if (args.length < 2) {
+			System.out.println("Usage: java indexer maxFilesToDownload bucketToDownloadFrom");
+			System.out.println("maxFilesToDownload is an int. If you want no limit, input -1.");
+			System.out.println("Bucket name should correspond to the S3 bucket to be pulling from, i.e. for.indexer");
+			System.exit(0);
+		}
+		if (Integer.parseInt(args[0]) == -1) {
 			maxFiles = Integer.MAX_VALUE;
-			//maxFiles = 1; // for testing only
 		} else {
 			maxFiles = Integer.parseInt(args[0]);
 		}
+		bucketName = args[1];
 		keepRunning = true;
 		numFiles = 0;
-		objectToFileName = new HashMap<InputStream, String>();
+		objectToFileName = new HashMap<S3Object, String>();
 		new Indexer();
-		// Term curr = DBWrapperIndexer.getTerm("ISIS");
-		// System.out.println(curr.getTermFrequency("http://www.nytimes.com"));
 	}
 
 	/**
@@ -88,19 +92,13 @@ public class Indexer {
 	 * PageRank results from S3 to EBS.
 	 */
 	public void init() {
-		// pulls from S3
-		// adds new url -> docContent to the blocking queue
 		FileDownloader fd = new FileDownloader();
 		fd.start();
-		System.out.println("HERE HERE HERE HERE");
 		try {
 			Thread.sleep(3000);
 		} catch (InterruptedException e) {
 			e.printStackTrace();
 		}
-		// parse what we pulled from S3 here
-		// check to see if it's XML or HTML
-		// create new page and add to Blocking Queue
 		indexerThreads = new HashSet<DocIndexer>();
 		for (int i = 0; i < 10; i++) {
 			DocIndexer tmp = new DocIndexer();
@@ -115,7 +113,7 @@ public class Indexer {
 			concatenatorThreads.add(tmp);
 		}
 
-		// after all urls and content have been read from S3,
+		// TODO after all urls and content have been read from S3,
 		// check for PageRank results
 		// put all PR results to database, mapping url to PageRank score
 	}
@@ -143,7 +141,6 @@ public class Indexer {
 				if (curr == null) {
 					continue;
 				}
-				System.out.println("Bout to index");
 				Doc doc = new Doc(curr.getUrl(), curr.getContent());
 				doc.parseDocument();
 			}
@@ -171,7 +168,6 @@ public class Indexer {
 		}
 
 		private AmazonS3 s3;
-		private String bucketName;
 
 		/**
 		 * Pulls files from S3 that contain documents that need to be indexed.
@@ -193,7 +189,7 @@ public class Indexer {
 			Region usEast1 = Region.getRegion(Regions.US_EAST_1);
 			s3.setRegion(usEast1);
 
-			bucketName = "for.indexer";
+			//bucketName = "for.indexer"; //no longer needed. Now supplied as command-line argument
 			System.out.println("Listing objects");
 			ObjectListing objectListing = s3
 					.listObjects(new ListObjectsRequest().withBucketName(
@@ -201,6 +197,8 @@ public class Indexer {
 			for (S3ObjectSummary objectSummary : objectListing
 					.getObjectSummaries()) {
 				if (!keepRunning) break;
+				numFiles += 1;
+				if (numFiles > maxFiles) break;
 				String key = objectSummary.getKey();
 				System.out.println("Getting object: " + key);
 				S3File tmp;
@@ -218,7 +216,7 @@ public class Indexer {
 					tmp.finishedIndexing(true);
 					DBWrapperIndexer.putS3File(tmp);
 				}
-				// break;
+				// break; // for testing purposes only
 			}
 		}
 
@@ -234,8 +232,8 @@ public class Indexer {
 					.getObject(new GetObjectRequest(bucketName, key));
 			System.out.println("About to concatenate");
 			// TODO Fix this (spot #1)
-			objectToFileName.put(object.getObjectContent(), key);
-			s3FilesBQ.add(object.getObjectContent());
+			objectToFileName.put(object, key);
+			s3FilesBQ.add(object);
 		}
 	}
 	
@@ -252,14 +250,14 @@ public class Indexer {
 		public void run() {
 			while (!stopper) {
 				InputStream input = null;
+				S3Object tmp = null;
 				boolean keepChecking = true;
 				while (keepChecking) {
-					input = s3FilesBQ.poll();
-					if (input != null) {
+					tmp = s3FilesBQ.poll();
+					if (tmp != null) {
 						keepChecking = false;
 					}
 				}
-				numFiles += 1;
 				if (numFiles > maxFiles) {
 					keepRunning = false;
 					for (Concatenator c : concatenatorThreads) {
@@ -267,23 +265,13 @@ public class Indexer {
 						c.stopThread();
 					}
 				}
-				ArrayList<String> pages = null;
 				try {
-					pages = concatenateTextInputStream(input);
-					System.out.println("returned");
+					input = tmp.getObjectContent();
+					concatenateTextInputStream(input);
 				} catch (IOException e) {
 					e.printStackTrace();
 				}
-				for (String p : pages) {
-					String[] splitted = p.split("\t", 2);
-					Page page = new Page(splitted[0], splitted[1]);
-					pagesBQ.add(page);
-					System.out.println("URL IS " + page.getUrl());
-					// System.out.println("CONTENT IS: " + page.getContent());
-					// break;
-				}
 				input = null;
-				System.out.println("Pages Downloaded: " + pages.size());
 				// TODO Fix this (Spot #2)
 				//String key = objectToFileName.get(input);
 				//S3File tmp = DBWrapperIndexer.getS3File(key);
@@ -298,33 +286,35 @@ public class Indexer {
 
 		/**
 		 * Splits a file into individual pages.
-		 * 
+		 * Adds each page to the blocking queue incrementally.
 		 * @param input
 		 *            : an InputStream to read from the S3 file
-		 * @return an array list where each element is a document's content
 		 * @throws IOException
 		 */
-		private ArrayList<String> concatenateTextInputStream(InputStream input)
+		private void concatenateTextInputStream(InputStream input)
 				throws IOException {
 			String output = "";
-			ArrayList<String> splitted = new ArrayList<String>();
 			BufferedReader reader = new BufferedReader(new InputStreamReader(
 					input));
 			while (true) {
 				String line = reader.readLine();
-				// System.out.println("LINE IS: " + line);
 				if (line == null) {
-					System.out.println("LINE IS NULL");
 					break;
 				}
 				if (line.contains("CIS555###Split%%%Document***Line")) {
 					if (line.trim().equals("CIS555###Split%%%Document***Line")) {
-						splitted.add(output);
+						String[] pageString = output.split("\t", 2);
+						Page page = new Page(pageString[0], pageString[1]);
+						pagesBQ.add(page);
+						System.out.println("URL IS " + page.getUrl());
 						output = "";
 					} else {
 						output += line
 								.split("CIS555###Split%%%Document\\*\\*\\*Line")[0];
-						splitted.add(output);
+						String[] pageString = output.split("\t", 2);
+						Page page = new Page(pageString[0], pageString[1]);
+						pagesBQ.add(page);
+						System.out.println("URL IS " + page.getUrl());
 						output = line
 								.split("CIS555###Split%%%Document\\*\\*\\*Line")[1];
 					}
@@ -334,7 +324,6 @@ public class Indexer {
 				output += line;
 			}
 			System.out.println("Finished concatenating");
-			return splitted;
 		}
 	}
 

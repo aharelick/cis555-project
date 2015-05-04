@@ -28,8 +28,9 @@ public class Doc {
 	 */
 	private void addToInvertedIndex(String word) {
 		// This is currently changing something like "Horses." to
-		// "horses" and "carry-on" becomes "carryon"
+		// "horses" and "carry-on" to "carryon"
 		String basicWord = word.replaceAll("[^A-Za-z0-9]", "");
+		basicWord = basicWord.toLowerCase();
 		if (wordOccurrences.containsKey(basicWord)) {
 			int tmp = wordOccurrences.get(basicWord);
 			wordOccurrences.put(basicWord, tmp += 1);
@@ -92,7 +93,7 @@ public class Doc {
 		//frequency, check if contained in the hashmap first before putting
 		HashMap<String,Double> scores = new HashMap<String,Double>();
 		for (String term : wordOccurrences.keySet()) {
-			if (term.equals("ISIS")) {
+			if (term.equals("isis")) {
 				System.out.println("We found ISIS and their TF is: " + getTermFrequency("ISIS"));
 				System.out.println("ISIS can be found at: " + url);
 			}

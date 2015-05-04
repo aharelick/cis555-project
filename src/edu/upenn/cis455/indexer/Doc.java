@@ -8,6 +8,8 @@ import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
 import org.jsoup.parser.Parser;
 
+import edu.upenn.cis455.storage.DBWrapperIndexer;
+
 public class Doc {
 
 	private String url;
@@ -56,14 +58,21 @@ public class Doc {
 	
 	public void parseDocument() {
 		Document d = Jsoup.parse(html);
+		DocInfo docInfo = new DocInfo();
+		docInfo.setUrl(url);
+		String title = d.title();
+		docInfo.setTitle(title);
 		String text = d.body().text();
+		docInfo.setDocText(text);
 		String[] tokens = text.split(" ");
 		int i = 0;
 		for (String t : tokens) {
 			addToInvertedIndex(t);
 			addLocation(t, i);
 			i++;
+			docInfo.addWord(t);
 		}
+		DBWrapperIndexer.putDocInfo(docInfo);
 		//pushInvertedIndex();
 		pushDocInfo();
 	}

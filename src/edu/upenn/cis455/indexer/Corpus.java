@@ -19,8 +19,6 @@ public class Corpus {
 	public static void addDocInfo(String url, HashMap<String, Double> tf,
 			HashMap<String, LinkedList<Integer>> loc) {
 		Set<String> terms = tf.keySet();
-		System.out.println("Term size: " + terms.size());
-		System.out.println("Location size: " + loc.size());
 		for (String term : terms) {
 			Term dbTerm = DBWrapperIndexer.getTerm(term);
 			if (dbTerm == null) {
@@ -32,6 +30,7 @@ public class Corpus {
 			dbTerm.addLocationList(url, termLoc);
 			DBWrapperIndexer.putTerm(dbTerm);
 		}
+		System.out.println("Finished one page");
 		
 	}
 	

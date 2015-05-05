@@ -128,7 +128,6 @@ public class Doc {
 	 * on the given document
 	 */
 	public Double getTermFrequency(String word) {
-		// might be an unnecessary line of code
 		return (new Double(wordOccurrences.get(word))/new Double(wordOccurrences.keySet().size()));
 	}
 	

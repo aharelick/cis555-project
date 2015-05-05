@@ -138,24 +138,28 @@ public class Indexer {
 	class DocIndexer extends Thread {
 		
 		Doc doc;
+		private int docsIndexed;
 
 		public DocIndexer() {
 			doc = new Doc();
 			doc.init();
+			docsIndexed = 0;
 		}
 
 		@Override
 		public void run() {
 			while (true) {
+				//if (docsIndexed > 2 && pagesBQ.isEmpty() && !keepRunning) {
+				//	break;
+				//}
 				Page curr = pagesBQ.poll();
 				if (curr == null) {
 					continue;
 				}
+				docsIndexed += 1;
 				doc.clearMaps();
 				doc.updateInfo(curr.getUrl(), curr.getContent());
-				System.out.println("ABOUT TO PARSE");
 				doc.parseDocument();
-				System.out.println("FINISHED PARSING");
 			}
 		}
 
@@ -201,10 +205,6 @@ public class Indexer {
 		 * Pulls files from S3 that contain documents that need to be indexed.
 		 */
 		private void extractObject() {
-
-			// bucketName = "for.indexer"; //no longer needed. Now supplied as
-			// command-line argument
-			System.out.println("Listing objects");
 			ObjectListing objectListing = s3
 					.listObjects(new ListObjectsRequest().withBucketName(
 							bucketName).withPrefix("DocS3batch:"));
@@ -223,7 +223,6 @@ public class Indexer {
 							break;
 						}
 						indexFile(key);
-						// TODO Fix this (Spot 3) - change to false
 						tmp.finishedIndexing(false);
 						DBWrapperIndexer.putS3File(tmp);
 					}
@@ -235,11 +234,9 @@ public class Indexer {
 					}
 					tmp = new S3File(key);
 					indexFile(key);
-					// TODO Fix this (Spot 4) - change to false
 					tmp.finishedIndexing(false);
 					DBWrapperIndexer.putS3File(tmp);
 				}
-				// break; // for testing purposes only
 			}
 			keepRunning = false;
 		}
@@ -254,7 +251,6 @@ public class Indexer {
 		private void indexFile(String key) {
 			S3Object object = s3
 					.getObject(new GetObjectRequest(bucketName, key));
-			// TODO Fix this (spot #1)
 			objectToFileName.put(object, key);
 			s3FilesBQ.add(object);
 		}
@@ -319,7 +315,6 @@ public class Indexer {
 					break;
 				}
 				} catch (IOException e1) {
-						// TODO Auto-generated catch block
 					System.out.println("reader readline failed");
 					e1.printStackTrace();
 					return;
@@ -368,7 +363,6 @@ public class Indexer {
 				}
 				output += line;
 			}
-			// TODO Fix this (Spot #2)
 			String key = objectToFileName.get(object);
 			S3File temp = DBWrapperIndexer.getS3File(key);
 			temp.finishedIndexing(true);

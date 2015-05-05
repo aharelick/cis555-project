@@ -314,14 +314,18 @@ public class Indexer {
 						System.out.println("URL IS " + page.getUrl());
 						output = "";
 					} else {
-						output += line
-								.split("CIS555###Split%%%Document\\*\\*\\*Line")[0];
+						String[] delimited = line.split("CIS555###Split%%%Document\\*\\*\\*Line");
+						output += delimited[0];
 						String[] pageString = output.split("\t", 2);
 						Page page = new Page(pageString[0], pageString[1]);
 						pagesBQ.add(page);
 						System.out.println("URL IS " + page.getUrl());
+						if (delimited.length > 1) {
 						output = line
 								.split("CIS555###Split%%%Document\\*\\*\\*Line")[1];
+						} else {
+							output = "";
+						}
 					}
 					// break; //comment this out for real use
 					continue; // comment this in for real use

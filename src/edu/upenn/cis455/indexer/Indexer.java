@@ -304,6 +304,7 @@ public class Indexer {
 			while (true) {
 				String line = reader.readLine();
 				if (line == null) {
+					reader.close();
 					break;
 				}
 				if (line.contains("CIS555###Split%%%Document***Line")) {

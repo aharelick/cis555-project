@@ -69,12 +69,18 @@ public class Indexer {
 	 */
 	public static void main(String[] args) {
 		if (args.length < 5) {
-			System.out.println("Usage: java indexer maxFilesToDownload bucketToDownloadFrom databaseDir numDownloaderThreads numIndexerThreads");
-			System.out.println("maxFilesToDownload is an int. If you want no limit, input -1.");
-			System.out.println("Bucket name should correspond to the S3 bucket to be pulling from, i.e. for.indexer");
-			System.out.println("databaseDir should be where you want the data to be put");
-			System.out.println("numDownloadThreads should be set to something like 20");
-			System.out.println("numIndexerThreads should be set to something like 50 or 100");
+			System.out
+					.println("Usage: java indexer maxFilesToDownload bucketToDownloadFrom databaseDir numDownloaderThreads numIndexerThreads");
+			System.out
+					.println("maxFilesToDownload is an int. If you want no limit, input -1.");
+			System.out
+					.println("Bucket name should correspond to the S3 bucket to be pulling from, i.e. for.indexer");
+			System.out
+					.println("databaseDir should be where you want the data to be put");
+			System.out
+					.println("numDownloadThreads should be set to something like 20");
+			System.out
+					.println("numIndexerThreads should be set to something like 50 or 100");
 			System.exit(0);
 		}
 		if (Integer.parseInt(args[0]) == -1) {
@@ -190,14 +196,16 @@ public class Indexer {
 			Region usEast1 = Region.getRegion(Regions.US_EAST_1);
 			s3.setRegion(usEast1);
 
-			//bucketName = "for.indexer"; //no longer needed. Now supplied as command-line argument
+			// bucketName = "for.indexer"; //no longer needed. Now supplied as
+			// command-line argument
 			System.out.println("Listing objects");
 			ObjectListing objectListing = s3
 					.listObjects(new ListObjectsRequest().withBucketName(
 							bucketName).withPrefix("DocS3batch:"));
 			for (S3ObjectSummary objectSummary : objectListing
 					.getObjectSummaries()) {
-				if (!keepRunning) break;
+				if (!keepRunning)
+					break;
 				String key = objectSummary.getKey();
 				System.out.println("Getting object: " + key);
 				S3File tmp;
@@ -246,7 +254,6 @@ public class Indexer {
 			s3FilesBQ.add(object);
 		}
 	}
-	
 
 	class Concatenator extends Thread {
 
@@ -289,8 +296,9 @@ public class Indexer {
 		}
 
 		/**
-		 * Splits a file into individual pages.
-		 * Adds each page to the blocking queue incrementally.
+		 * Splits a file into individual pages. Adds each page to the blocking
+		 * queue incrementally.
+		 * 
 		 * @param input
 		 *            : an InputStream to read from the S3 file
 		 * @throws IOException
@@ -315,15 +323,20 @@ public class Indexer {
 						System.out.println("URL IS " + page.getUrl());
 						output = "";
 					} else {
-						String[] delimited = line.split("CIS555###Split%%%Document\\*\\*\\*Line");
+						String[] delimited = line
+								.split("CIS555###Split%%%Document\\*\\*\\*Line");
 						output += delimited[0];
 						String[] pageString = output.split("\t", 2);
+						if (pageString.length < 2) {
+							output = "";
+							continue;
+						}
 						Page page = new Page(pageString[0], pageString[1]);
 						pagesBQ.add(page);
 						System.out.println("URL IS " + page.getUrl());
 						if (delimited.length > 1) {
-						output = line
-								.split("CIS555###Split%%%Document\\*\\*\\*Line")[1];
+							output = line
+									.split("CIS555###Split%%%Document\\*\\*\\*Line")[1];
 						} else {
 							output = "";
 						}

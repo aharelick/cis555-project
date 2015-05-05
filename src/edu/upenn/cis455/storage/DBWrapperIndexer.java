@@ -52,16 +52,16 @@ public class DBWrapperIndexer {
         System.out.println("Database Started");
 	}
 	
-	public synchronized static Term getTerm(String term) {
+	public static Term getTerm(String term) {
 		return termIndex.get(term);
 	}
 	
-	public synchronized static void putTerm(Term term) {
+	public static void putTerm(Term term) {
 		termIndex.put(term);
 		sync();
 	}
 	
-	public synchronized static void deleteTerm(String term) {
+	public static void deleteTerm(String term) {
 		termIndex.delete(term);
 		sync();
 	}
@@ -70,20 +70,20 @@ public class DBWrapperIndexer {
 		store.sync();
 	}
 	
-	public synchronized static S3File getS3File(String filename) {
+	public static S3File getS3File(String filename) {
 		return s3FileIndex.get(filename);
 	}
 	
-	public synchronized static void putS3File(S3File s3File) {
+	public static void putS3File(S3File s3File) {
 		s3FileIndex.put(s3File);
 		sync();
 	}
 	
-	public synchronized static void deleteS3File(String filename) {
+	public static void deleteS3File(String filename) {
 		s3FileIndex.delete(filename);
 		sync();
 	}
-	public synchronized static void putDocInfo(DocInfo docInfo)
+	public static void putDocInfo(DocInfo docInfo)
 	{
 		docInfoIndex.put(docInfo);
 	}

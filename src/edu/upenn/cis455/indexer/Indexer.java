@@ -24,7 +24,6 @@ import com.amazonaws.services.s3.model.S3ObjectSummary;
 
 import edu.upenn.cis455.storage.DBWrapperIndexer;
 import edu.upenn.cis455.storage.S3File;
-import edu.upenn.cis455.storage.Term;
 
 //import edu.upenn.cis455.storage.Term;
 
@@ -49,16 +48,8 @@ public class Indexer {
 	 * start().
 	 */
 	public Indexer() {
-		// spins up all the DocIndexer threads
 		pagesBQ = new LinkedBlockingQueue<Page>();
 		s3FilesBQ = new LinkedBlockingQueue<S3Object>();
-		// TODO fix with actual location as argument
-		DBWrapperIndexer.init("/home/cis455/workspace/cis555-project/database");
-		/*Term curr = DBWrapperIndexer.getTerm("privacy");
-		System.out.println("curr is "+curr);
-		Term current = DBWrapperIndexer.getTerm("past");
-		System.out.println("curr is "+current);*/
-		//System.out.println(curr.getTermFrequency("http://www.nytimes.com"));
 		init();
 	}
 
@@ -76,9 +67,10 @@ public class Indexer {
 	 */
 	public static void main(String[] args) {
 		if (args.length < 2) {
-			System.out.println("Usage: java indexer maxFilesToDownload bucketToDownloadFrom");
+			System.out.println("Usage: java indexer maxFilesToDownload bucketToDownloadFrom databaseDir");
 			System.out.println("maxFilesToDownload is an int. If you want no limit, input -1.");
 			System.out.println("Bucket name should correspond to the S3 bucket to be pulling from, i.e. for.indexer");
+			System.out.println("databaseDir should be where you want the data to be put");
 			System.exit(0);
 		}
 		if (Integer.parseInt(args[0]) == -1) {
@@ -87,6 +79,7 @@ public class Indexer {
 			maxFiles = Integer.parseInt(args[0]);
 		}
 		bucketName = args[1];
+		DBWrapperIndexer.init(args[2]);
 		keepRunning = true;
 		numFiles = 0;
 		objectToFileName = new HashMap<S3Object, String>();
@@ -106,22 +99,18 @@ public class Indexer {
 			e.printStackTrace();
 		}
 		indexerThreads = new HashSet<DocIndexer>();
-		for (int i = 0; i < 10; i++) {
+		for (int i = 0; i < 20; i++) {
 			DocIndexer tmp = new DocIndexer();
 			tmp.start();
 			indexerThreads.add(tmp);
 		}
 
 		concatenatorThreads = new HashSet<Concatenator>();
-		for (int i = 0; i < 4; i++) {
+		for (int i = 0; i < 6; i++) {
 			Concatenator tmp = new Concatenator();
 			tmp.start();
 			concatenatorThreads.add(tmp);
 		}
-
-		// TODO after all urls and content have been read from S3,
-		// check for PageRank results
-		// put all PR results to database, mapping url to PageRank score
 	}
 
 	private HashSet<Concatenator> concatenatorThreads;
@@ -203,27 +192,36 @@ public class Indexer {
 			for (S3ObjectSummary objectSummary : objectListing
 					.getObjectSummaries()) {
 				if (!keepRunning) break;
-				numFiles += 1;
-				if (numFiles > maxFiles) break;
 				String key = objectSummary.getKey();
 				System.out.println("Getting object: " + key);
 				S3File tmp;
 				if ((tmp = DBWrapperIndexer.getS3File(key)) != null) {
 					if (!tmp.wasIndexed()) {
+						numFiles += 1;
+						if (numFiles > maxFiles) {
+							keepRunning = false;
+							break;
+						}
 						indexFile(key);
 						// TODO Fix this (Spot 3) - change to false
-						tmp.finishedIndexing(true);
+						tmp.finishedIndexing(false);
 						DBWrapperIndexer.putS3File(tmp);
 					}
 				} else {
+					numFiles += 1;
+					if (numFiles > maxFiles) {
+						keepRunning = false;
+						break;
+					}
 					tmp = new S3File(key);
 					indexFile(key);
 					// TODO Fix this (Spot 4) - change to false
-					tmp.finishedIndexing(true);
+					tmp.finishedIndexing(false);
 					DBWrapperIndexer.putS3File(tmp);
 				}
 				// break; // for testing purposes only
 			}
+			keepRunning = false;
 		}
 
 		/**
@@ -254,8 +252,8 @@ public class Indexer {
 
 		@Override
 		public void run() {
+			stopper = false;
 			while (!stopper) {
-				InputStream input = null;
 				S3Object tmp = null;
 				boolean keepChecking = true;
 				while (keepChecking) {
@@ -270,19 +268,13 @@ public class Indexer {
 						stopper = true;
 						c.stopThread();
 					}
+				} else {
+					try {
+						concatenateTextInputStream(tmp);
+					} catch (IOException e) {
+						e.printStackTrace();
+					}
 				}
-				try {
-					input = tmp.getObjectContent();
-					concatenateTextInputStream(input);
-				} catch (IOException e) {
-					e.printStackTrace();
-				}
-				input = null;
-				// TODO Fix this (Spot #2)
-				//String key = objectToFileName.get(input);
-				//S3File tmp = DBWrapperIndexer.getS3File(key);
-				//tmp.finishedIndexing(true);
-				//DBWrapperIndexer.putS3File(tmp);
 			}
 		}
 
@@ -297,9 +289,10 @@ public class Indexer {
 		 *            : an InputStream to read from the S3 file
 		 * @throws IOException
 		 */
-		private void concatenateTextInputStream(InputStream input)
+		private void concatenateTextInputStream(S3Object object)
 				throws IOException {
 			String output = "";
+			InputStream input = object.getObjectContent();
 			BufferedReader reader = new BufferedReader(new InputStreamReader(
 					input));
 			while (true) {
@@ -329,6 +322,11 @@ public class Indexer {
 				}
 				output += line;
 			}
+			// TODO Fix this (Spot #2)
+			String key = objectToFileName.get(object);
+			S3File temp = DBWrapperIndexer.getS3File(key);
+			temp.finishedIndexing(true);
+			DBWrapperIndexer.putS3File(temp);
 			System.out.println("Finished concatenating");
 		}
 	}

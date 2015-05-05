@@ -18,6 +18,7 @@ public class DBWrapperIndexer {
 	private static PrimaryIndex<String, Term> termIndex;
 	private static PrimaryIndex<String, S3File> s3FileIndex;
 	private static PrimaryIndex<String, DocInfo> docInfoIndex;
+	private static PrimaryIndex<String, PageRank> pageRankIndex;
 	
 	/**
 	 * Create the DB if it doesn't exist and open it if it does exist.
@@ -47,6 +48,7 @@ public class DBWrapperIndexer {
         termIndex = store.getPrimaryIndex(String.class, Term.class);
         s3FileIndex = store.getPrimaryIndex(String.class, S3File.class);
         docInfoIndex = store.getPrimaryIndex(String.class, DocInfo.class);
+        pageRankIndex = store.getPrimaryIndex(String.class, PageRank.class);
         DatabaseShutdownHookIndexer hook = new DatabaseShutdownHookIndexer(myEnv, store);
         Runtime.getRuntime().addShutdownHook(hook);
         System.out.println("Database Started");
@@ -90,6 +92,14 @@ public class DBWrapperIndexer {
 	public static DocInfo getDocInfo(String url)
 	{
 		return docInfoIndex.get(url);
+	}
+	
+	public static void putPageRank(String u, Double pr) {
+		pageRankIndex.put(new PageRank(u, pr));
+	}
+	
+	public static void getPageRank(String u) {
+		pageRankIndex.get(u);
 	}
 }
 	

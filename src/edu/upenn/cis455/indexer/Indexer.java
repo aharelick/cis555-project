@@ -136,20 +136,26 @@ public class Indexer {
 	 * @author Corey Loman
 	 */
 	class DocIndexer extends Thread {
+		
+		Doc doc;
 
 		public DocIndexer() {
-
+			doc = new Doc();
+			doc.init();
 		}
 
 		@Override
 		public void run() {
-			while (keepRunning) {
+			while (true) {
 				Page curr = pagesBQ.poll();
 				if (curr == null) {
 					continue;
 				}
-				Doc doc = new Doc(curr.getUrl(), curr.getContent());
+				doc.clearMaps();
+				doc.updateInfo(curr.getUrl(), curr.getContent());
+				System.out.println("ABOUT TO PARSE");
 				doc.parseDocument();
+				System.out.println("FINISHED PARSING");
 			}
 		}
 
@@ -169,17 +175,6 @@ public class Indexer {
 
 		@Override
 		public void run() {
-			while (keepRunning) {
-				extractObject();
-			}
-		}
-
-		private AmazonS3 s3;
-
-		/**
-		 * Pulls files from S3 that contain documents that need to be indexed.
-		 */
-		private void extractObject() {
 			AWSCredentials credentials = null;
 			try {
 				credentials = new ProfileCredentialsProvider("default")
@@ -195,6 +190,17 @@ public class Indexer {
 			s3 = new AmazonS3Client(credentials);
 			Region usEast1 = Region.getRegion(Regions.US_EAST_1);
 			s3.setRegion(usEast1);
+			while (keepRunning) {
+				extractObject();
+			}
+		}
+
+		private AmazonS3 s3;
+
+		/**
+		 * Pulls files from S3 that contain documents that need to be indexed.
+		 */
+		private void extractObject() {
 
 			// bucketName = "for.indexer"; //no longer needed. Now supplied as
 			// command-line argument
@@ -207,7 +213,7 @@ public class Indexer {
 				if (!keepRunning)
 					break;
 				String key = objectSummary.getKey();
-				System.out.println("Getting object: " + key);
+				System.out.println("Getting object: " + key + " of size: " +objectSummary.getSize());
 				S3File tmp;
 				if ((tmp = DBWrapperIndexer.getS3File(key)) != null) {
 					if (!tmp.wasIndexed()) {
@@ -248,7 +254,6 @@ public class Indexer {
 		private void indexFile(String key) {
 			S3Object object = s3
 					.getObject(new GetObjectRequest(bucketName, key));
-			System.out.println("About to concatenate");
 			// TODO Fix this (spot #1)
 			objectToFileName.put(object, key);
 			s3FilesBQ.add(object);
@@ -338,6 +343,7 @@ public class Indexer {
 						Page page = new Page(pageString[0], pageString[1]);
 						pagesBQ.add(page);
 						System.out.println("URL IS " + page.getUrl());
+						System.out.println("Size of PagesBQ: " + pagesBQ.size());
 						if (delimited.length > 1) {
 							output = line
 									.split("CIS555###Split%%%Document\\*\\*\\*Line")[1];

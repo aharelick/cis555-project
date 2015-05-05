@@ -18,20 +18,16 @@ public class Corpus {
 	 */
 	public static void addDocInfo(String url, HashMap<String, Double> tf,
 			HashMap<String, LinkedList<Integer>> loc) {
-		
 		Set<String> terms = tf.keySet();
+		System.out.println("Term size: " + terms.size());
+		System.out.println("Location size: " + loc.size());
 		for (String term : terms) {
-			if (term.equals("ISIS")) System.out.println("WE HERE");
 			Term dbTerm = DBWrapperIndexer.getTerm(term);
 			if (dbTerm == null) {
 				dbTerm = new Term(term);
 			}
 			double freq = tf.get(term);
 			LinkedList<Integer> termLoc = loc.get(term);
-			if (term.equals("ISIS")) {
-				System.out.println("URL: " + url);
-				System.out.println("FREQ: " + freq);
-			}
 			dbTerm.addFrequency(url, freq);
 			dbTerm.addLocationList(url, termLoc);
 			DBWrapperIndexer.putTerm(dbTerm);

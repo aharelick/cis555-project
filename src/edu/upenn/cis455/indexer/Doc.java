@@ -14,9 +14,15 @@ public class Doc {
 	private String url;
 	private String html;
 	
-	public Doc(String u, String h) {
+	public Doc() {
+	}
+	
+	public void updateInfo(String u, String h) {
 		url = u;
 		html = h;
+	}
+	
+	public void init() {
 		wordOccurrences = new HashMap<String,Integer>();
 		locations = new HashMap<String, LinkedList<Integer>>();
 	}
@@ -52,7 +58,7 @@ public class Doc {
 	 */
 	private HashMap<String, Integer> wordOccurrences;
 	
-	public void parseDocument() {
+	public boolean parseDocument() {
 		Document d = Jsoup.parse(html);
 		DocInfo docInfo = new DocInfo();
 		docInfo.setUrl(url);
@@ -74,7 +80,8 @@ public class Doc {
 		}
 		DBWrapperIndexer.putDocInfo(docInfo);
 		//pushInvertedIndex();
-		pushDocInfo();
+		boolean b = pushDocInfo();
+		return b;
 	}
 	
 
@@ -95,19 +102,16 @@ public class Doc {
 	 */
 	private HashMap<String, LinkedList<Integer>> locations;
 
-	private void pushDocInfo() {
+	private boolean pushDocInfo() {
 		// put all the TF scores in the DB
 		// DB has a term as the key that maps a url to that term's
 		//frequency, check if contained in the hashmap first before putting
 		HashMap<String,Double> scores = new HashMap<String,Double>();
 		for (String term : wordOccurrences.keySet()) {
-			if (term.equals("isis")) {
-				System.out.println("We found ISIS and their TF is: " + getTermFrequency("ISIS"));
-				System.out.println("ISIS can be found at: " + url);
-			}
 			scores.put(term, getTermFrequency(term));
 		}
 		Corpus.addDocInfo(url, scores, locations);
+		return true;
 	}
 
 	/**
@@ -130,6 +134,11 @@ public class Doc {
 	
 	public LinkedList<Integer> getTermLocations(String word) {
 		return locations.get(word);
+	}
+	
+	public void clearMaps() {
+		wordOccurrences.clear();
+		locations.clear();
 	}
 	
 }

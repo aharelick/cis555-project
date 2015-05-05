@@ -98,8 +98,8 @@ public class DBWrapperIndexer {
 		pageRankIndex.put(new PageRank(u, pr));
 	}
 	
-	public static void getPageRank(String u) {
-		pageRankIndex.get(u);
+	public static PageRank getPageRank(String u) {
+		return pageRankIndex.get(u);
 	}
 }
 	

@@ -58,6 +58,8 @@ public class Indexer {
 	private static boolean keepRunning;
 	protected static HashMap<S3Object, String> objectToFileName;
 	private static String bucketName;
+	private static int numConcatThreads;
+	private static int numIndexerThreads;
 
 	/**
 	 * used solely for testing the indexer
@@ -66,11 +68,13 @@ public class Indexer {
 	 *            : command-line arguments
 	 */
 	public static void main(String[] args) {
-		if (args.length < 2) {
-			System.out.println("Usage: java indexer maxFilesToDownload bucketToDownloadFrom databaseDir");
+		if (args.length < 5) {
+			System.out.println("Usage: java indexer maxFilesToDownload bucketToDownloadFrom databaseDir numDownloaderThreads numIndexerThreads");
 			System.out.println("maxFilesToDownload is an int. If you want no limit, input -1.");
 			System.out.println("Bucket name should correspond to the S3 bucket to be pulling from, i.e. for.indexer");
 			System.out.println("databaseDir should be where you want the data to be put");
+			System.out.println("numDownloadThreads should be set to something like 20");
+			System.out.println("numIndexerThreads should be set to something like 50 or 100");
 			System.exit(0);
 		}
 		if (Integer.parseInt(args[0]) == -1) {
@@ -80,6 +84,8 @@ public class Indexer {
 		}
 		bucketName = args[1];
 		DBWrapperIndexer.init(args[2]);
+		numConcatThreads = Integer.parseInt(args[3]);
+		numIndexerThreads = Integer.parseInt(args[4]);
 		keepRunning = true;
 		numFiles = 0;
 		objectToFileName = new HashMap<S3Object, String>();
@@ -99,14 +105,14 @@ public class Indexer {
 			e.printStackTrace();
 		}
 		indexerThreads = new HashSet<DocIndexer>();
-		for (int i = 0; i < 20; i++) {
+		for (int i = 0; i < numIndexerThreads; i++) {
 			DocIndexer tmp = new DocIndexer();
 			tmp.start();
 			indexerThreads.add(tmp);
 		}
 
 		concatenatorThreads = new HashSet<Concatenator>();
-		for (int i = 0; i < 6; i++) {
+		for (int i = 0; i < numConcatThreads; i++) {
 			Concatenator tmp = new Concatenator();
 			tmp.start();
 			concatenatorThreads.add(tmp);

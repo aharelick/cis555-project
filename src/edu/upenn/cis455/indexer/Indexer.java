@@ -318,6 +318,10 @@ public class Indexer {
 				if (line.contains("CIS555###Split%%%Document***Line")) {
 					if (line.trim().equals("CIS555###Split%%%Document***Line")) {
 						String[] pageString = output.split("\t", 2);
+						if (pageString.length < 2) {
+							output = "";
+							continue;
+						}
 						Page page = new Page(pageString[0], pageString[1]);
 						pagesBQ.add(page);
 						System.out.println("URL IS " + page.getUrl());

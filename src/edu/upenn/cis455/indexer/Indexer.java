@@ -287,11 +287,7 @@ public class Indexer {
 						c.stopThread();
 					}
 				} else {
-					try {
-						concatenateTextInputStream(tmp);
-					} catch (IOException e) {
-						e.printStackTrace();
-					}
+					concatenateTextInputStream(tmp);
 				}
 			}
 		}
@@ -308,29 +304,45 @@ public class Indexer {
 		 *            : an InputStream to read from the S3 file
 		 * @throws IOException
 		 */
-		private void concatenateTextInputStream(S3Object object)
-				throws IOException {
+		private void concatenateTextInputStream(S3Object object) {
 			String output = "";
 			InputStream input = object.getObjectContent();
 			BufferedReader reader = new BufferedReader(new InputStreamReader(
 					input));
 			while (true) {
-				String line = reader.readLine();
+				String line = "";
+				try {
+					line = reader.readLine();
+				
 				if (line == null) {
 					reader.close();
 					break;
 				}
+				} catch (IOException e1) {
+						// TODO Auto-generated catch block
+					System.out.println("reader readline failed");
+					e1.printStackTrace();
+					return;
+						
+					}
 				if (line.contains("CIS555###Split%%%Document***Line")) {
 					if (line.trim().equals("CIS555###Split%%%Document***Line")) {
-						String[] pageString = output.split("\t", 2);
-						if (pageString.length < 2) {
+						try {
+							String[] pageString = output.split("\t", 2);
+							if (pageString.length < 2) {
+								output = "";
+								continue;
+							}
+
+							Page page = new Page(pageString[0], pageString[1]);
+							pagesBQ.add(page);
+							System.out.println("URL IS " + page.getUrl());
 							output = "";
-							continue;
+						} catch (Exception e) {
+							System.out.println("line splitting failed");
+							e.printStackTrace();
+							return;
 						}
-						Page page = new Page(pageString[0], pageString[1]);
-						pagesBQ.add(page);
-						System.out.println("URL IS " + page.getUrl());
-						output = "";
 					} else {
 						String[] delimited = line
 								.split("CIS555###Split%%%Document\\*\\*\\*Line");

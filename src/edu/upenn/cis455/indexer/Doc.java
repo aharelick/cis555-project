@@ -125,9 +125,7 @@ public class Doc {
 	 */
 	public Double getTermFrequency(String word) {
 		// might be an unnecessary line of code
-		String basicWord = word.replaceAll("[^A-Za-z0-9]", "");
-		basicWord = basicWord.toLowerCase();
-		return (new Double(wordOccurrences.get(basicWord))/new Double(wordOccurrences.keySet().size()));
+		return (new Double(wordOccurrences.get(word))/new Double(wordOccurrences.keySet().size()));
 	}
 	
 	public LinkedList<Integer> getTermLocations(String word) {

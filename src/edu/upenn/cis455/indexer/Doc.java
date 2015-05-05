@@ -6,7 +6,6 @@ import java.util.Set;
 
 import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
-import org.jsoup.parser.Parser;
 
 import edu.upenn.cis455.storage.DBWrapperIndexer;
 
@@ -29,15 +28,11 @@ public class Doc {
 	 * @param word
 	 */
 	private void addToInvertedIndex(String word) {
-		// This is currently changing something like "Horses." to
-		// "horses" and "carry-on" to "carryon"
-		String basicWord = word.replaceAll("[^A-Za-z0-9]", "");
-		basicWord = basicWord.toLowerCase();
-		if (wordOccurrences.containsKey(basicWord)) {
-			int tmp = wordOccurrences.get(basicWord);
-			wordOccurrences.put(basicWord, tmp += 1);
+		if (wordOccurrences.containsKey(word)) {
+			int tmp = wordOccurrences.get(word);
+			wordOccurrences.put(word, tmp += 1);
 		} else {
-			wordOccurrences.put(basicWord, 1);
+			wordOccurrences.put(word, 1);
 		}
 	}
 	
@@ -68,10 +63,14 @@ public class Doc {
 		String[] tokens = text.split(" ");
 		int i = 0;
 		for (String t : tokens) {
-			addToInvertedIndex(t);
-			addLocation(t, i);
+			// This is currently changing something like "Horses." to
+			// "horses" and "carry-on" to "carryon"
+			String basicWord = t.replaceAll("[^A-Za-z0-9]", "");
+			basicWord = basicWord.toLowerCase();
+			addToInvertedIndex(basicWord);
+			addLocation(basicWord, i);
 			i++;
-			docInfo.addWord(t);
+			docInfo.addWord(basicWord);
 		}
 		DBWrapperIndexer.putDocInfo(docInfo);
 		//pushInvertedIndex();
